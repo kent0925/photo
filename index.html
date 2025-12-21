@@ -14,102 +14,74 @@
             display: flex; flex-direction: column; align-items: center;
         }
 
-        .header-box { text-align: center; width: 100%; max-width: 500px; margin-bottom: 20px; }
-        
+        /* 彈窗遮罩樣式 */
+        #viewerOverlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.9); display: none; z-index: 9999;
+            flex-direction: column; align-items: center; justify-content: center;
+        }
+        #viewerContent { width: 90%; max-width: 800px; height: 70vh; background: #000; border-radius: 8px; overflow: hidden; position: relative; }
+        #closeBtn { position: absolute; top: -45px; right: 0; color: white; font-size: 30px; cursor: pointer; font-weight: bold; }
+
         /* 浮動按鈕 */
-        .floating-menu {
-            position: fixed; bottom: 25px; right: 20px;
-            display: none; flex-direction: column; gap: 12px; z-index: 999;
-        }
-        .fab {
-            width: 55px; height: 55px; border-radius: 50%;
-            background-color: #5d4037; color: #e5d3b3;
-            border: 2px solid #e5d3b3; box-shadow: 2px 4px 10px rgba(0,0,0,0.4);
-            display: flex; align-items: center; justify-content: center;
-            font-size: 13px; font-weight: bold; cursor: pointer; text-align: center;
-        }
+        .floating-menu { position: fixed; bottom: 25px; right: 20px; display: none; flex-direction: column; gap: 12px; z-index: 999; }
+        .fab { width: 55px; height: 55px; border-radius: 50%; background: #5d4037; color: #e5d3b3; border: 2px solid #e5d3b3; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: bold; cursor: pointer; }
 
-        /* 相簿目錄卡片 - 調整寬度 */
-        .album-grid { 
-            display: grid; grid-template-columns: repeat(2, 1fr); 
-            gap: 15px; width: 100%; max-width: 400px; 
-        }
-        .album-card {
-            background: #fffef0; padding: 10px; border: 1px solid #5d4037;
-            box-shadow: 4px 4px 0px #5d4037; cursor: pointer; text-align: center;
-        }
-        .album-cover { width: 100%; aspect-ratio: 1 / 1; object-fit: cover; background: #ddd; border: 1px solid #ccc; }
+        /* 相簿與照片網格 */
+        .grid-container { display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; width: 100%; max-width: 400px; }
+        .card { background: #fffef0; padding: 10px; border: 1px solid #5d4037; cursor: pointer; text-align: center; box-shadow: 4px 4px 0px #5d4037; }
+        .card img { width: 100%; aspect-ratio: 1/1; object-fit: cover; }
+        
+        .photo-item { background: white; padding: 10px 10px 25px 10px; border: 1px solid #ddd; position: relative; box-shadow: 3px 3px 8px rgba(0,0,0,0.1); }
+        .photo-item img { width: 100%; aspect-ratio: 1/1; object-fit: cover; cursor: pointer; }
 
-        /* 照片網格 - 嚴格控制不被拉寬 */
-        .photo-grid { 
-            display: none; grid-template-columns: repeat(2, 1fr); 
-            gap: 15px; width: 100%; max-width: 400px; 
-        }
-        .photo-item {
-            background: white; padding: 10px 10px 25px 10px;
-            box-shadow: 3px 3px 8px rgba(0,0,0,0.15); border: 1px solid #ddd;
-            display: flex; flex-direction: column; position: relative;
-        }
-        /* 強制照片保持方正比例，不隨螢幕寬度變形 */
-        .photo-item img { 
-            width: 100%; aspect-ratio: 1 / 1; object-fit: cover; background: #f0f0f0; 
-        }
+        .video-label { position: absolute; top: 10px; left: 10px; right: 10px; aspect-ratio: 1/1; background: rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center; color: white; font-size: 40px; }
 
-        .video-overlay {
-            position: absolute; top: 10px; left: 10px; right: 10px; aspect-ratio: 1 / 1;
-            background: rgba(0,0,0,0.3); display: flex; align-items: center;
-            justify-content: center; color: white; font-size: 40px; cursor: pointer;
-        }
-
-        #uploadSection {
-            background: rgba(255, 254, 240, 0.9); padding: 15px; 
-            margin-bottom: 25px; border: 2px solid #5d4037; width: 90%; max-width: 350px; text-align: center;
-        }
-        #loading { font-style: italic; color: #8d6e63; margin-top: 20px; }
+        #uploadSection { background: rgba(255, 254, 240, 0.9); padding: 15px; margin-bottom: 25px; border: 2px solid #5d4037; width: 90%; max-width: 350px; text-align: center; }
     </style>
 </head>
 <body>
 
-    <div class="header-box">
-        <h2 id="userName">🎞️ 載入回憶中...</h2>
-    </div>
+    <h2 id="userName">🎞️ 載入回憶中...</h2>
 
     <div id="uploadSection">
         <h4 style="margin:0;">投稿新照片</h4>
         <input type="file" id="fileInput" accept="image/*,video/*">
-        <button onclick="uploadFile()" id="uploadBtn" style="width:100%; background:#5d4037; color:#e5d3b3; border:none; padding:10px; cursor:pointer; font-weight:bold; margin-top:10px;">送出回憶</button>
+        <button onclick="uploadFile()" id="uploadBtn" style="width:100%; background:#5d4037; color:#e5d3b3; border:none; padding:10px; cursor:pointer; font-weight:bold; margin-top:10px;">送出</button>
     </div>
 
-    <div id="loading">正在翻閱相簿...</div>
+    <div id="loading">翻閱中...</div>
 
-    <div id="albumGrid" class="album-grid"></div>
-    <div id="photoGrid" class="photo-grid"></div>
+    <div id="albumGrid" class="grid-container"></div>
+    <div id="photoGrid" class="grid-container" style="display:none;"></div>
+
+    <div id="viewerOverlay">
+        <div id="viewerContent">
+            <span id="closeBtn" onclick="closeViewer()">關閉 ✕</span>
+            <iframe id="viewerFrame" src="" style="width:100%; height:100%; border:none;" allow="autoplay"></iframe>
+        </div>
+    </div>
 
     <div id="floatingMenu" class="floating-menu">
-        <div class="fab" onclick="scrollToTop()">TOP</div>
+        <div class="fab" onclick="window.scrollTo({top:0, behavior:'smooth'})">TOP</div>
         <div class="fab" onclick="showAlbumList()">返回<br>列表</div>
     </div>
 
     <script>
         const gasUrl = 'https://script.google.com/macros/s/AKfycbyBsFLlYt415vWiBipXhvycp_OMoQAJZdtfBi85IvQ29sfyCQphy6P0RrhMndpoLT33/exec'; 
         const liffId = '2008678090-ZMqCkYFi'; 
-
         let allData = { categories: [], allFiles: [] };
 
         function getFileId(url) {
             let id = "";
-            if (url.includes('id=')) {
-                id = url.split('id=')[1].split('&')[0];
-            } else {
-                const match = url.match(/\/d\/(.+?)\//);
-                if (match) id = match[1];
-            }
+            if (url.includes('id=')) id = url.split('id=')[1].split('&')[0];
+            else { const match = url.match(/\/d\/(.+?)\//); if (match) id = match[1]; }
             return id;
         }
 
         async function initLIFF() {
             try {
-                await liff.init({ liffId: liffId });
+                await liff.init({ liffId });
                 if (!liff.isLoggedIn()) liff.login();
                 else {
                     const profile = await liff.getProfile();
@@ -125,9 +97,7 @@
                 allData = await response.json();
                 document.getElementById('loading').style.display = 'none';
                 showAlbumList();
-            } catch (err) {
-                document.getElementById('loading').innerText = "載入失敗";
-            }
+            } catch (err) { document.getElementById('loading').innerText = "載入失敗"; }
         }
 
         function showAlbumList() {
@@ -138,77 +108,68 @@
             albumGrid.innerHTML = "";
 
             allData.categories.forEach(cat => {
-                const photosInCat = allData.allFiles.filter(p => String(p.category) === String(cat.name));
-                const fid = photosInCat[0] ? getFileId(photosInCat[0].url) : "";
+                const photos = allData.allFiles.filter(p => String(p.category) === String(cat.name));
+                const fid = photos[0] ? getFileId(photos[0].url) : "";
                 const coverUrl = fid ? `https://drive.google.com/thumbnail?id=${fid}&sz=w400` : "";
-
-                const card = document.createElement('div');
-                card.className = 'album-card';
-                card.onclick = () => showPhotos(cat.name);
-                card.innerHTML = `
-                    <img class="album-cover" src="${coverUrl}">
-                    <div class="album-title" style="font-size:12px; margin-top:5px;">${cat.name}</div>
-                `;
-                albumGrid.appendChild(card);
+                const div = document.createElement('div');
+                div.className = 'card';
+                div.onclick = () => showPhotos(cat.name);
+                div.innerHTML = `<img src="${coverUrl}"><div style="font-size:12px;margin-top:5px;">${cat.name}</div>`;
+                albumGrid.appendChild(div);
             });
-            window.scrollTo({ top: 0, behavior: 'smooth' });
         }
 
-        function showPhotos(categoryName) {
+        function showPhotos(catName) {
             document.getElementById('albumGrid').style.display = 'none';
             document.getElementById('floatingMenu').style.display = 'flex';
             const photoGrid = document.getElementById('photoGrid');
             photoGrid.style.display = 'grid';
             photoGrid.innerHTML = "";
 
-            const filtered = allData.allFiles.filter(p => String(p.category) === String(categoryName));
-
-            filtered.forEach(item => {
+            allData.allFiles.filter(p => String(p.category) === String(catName)).forEach(item => {
+                const fid = getFileId(item.url);
+                const thumb = `https://drive.google.com/thumbnail?id=${fid}&sz=w600`;
                 const div = document.createElement('div');
                 div.className = 'photo-item';
-                const fid = getFileId(item.url);
-                const thumbUrl = `https://drive.google.com/thumbnail?id=${fid}&sz=w600`;
-                const openUrl = `https://drive.google.com/open?id=${fid}`;
+                div.onclick = () => openViewer(fid);
                 
-                if (item.type.includes('video')) {
-                    div.innerHTML = `
-                        <div class="video-overlay" onclick="window.open('${openUrl}')">▶</div>
-                        <img src="${thumbUrl}">
-                        <p style="font-size:10px; text-align:center; margin-top:5px;">(影片回憶)</p>
-                    `;
-                } else {
-                    div.innerHTML = `
-                        <img src="${thumbUrl}" loading="lazy" onclick="window.open('${openUrl}')">
-                        <p style="font-size:10px; text-align:center; margin-top:5px;">${item.name}</p>
-                    `;
-                }
+                let icon = item.type.includes('video') ? '<div class="video-label">▶</div>' : '';
+                div.innerHTML = `${icon}<img src="${thumb}"><p style="font-size:10px;text-align:center;margin-top:5px;">${item.name}</p>`;
                 photoGrid.appendChild(div);
             });
-            window.scrollTo({ top: 0, behavior: 'smooth' });
+            window.scrollTo(0,0);
         }
 
-        function scrollToTop() {
-            window.scrollTo({ top: 0, behavior: 'smooth' });
+        function openViewer(id) {
+            const frame = document.getElementById('viewerFrame');
+            // 使用 preview 連結，Google 會自動處理照片預覽與影片播放
+            frame.src = `https://drive.google.com/file/d/${id}/preview`;
+            document.getElementById('viewerOverlay').style.display = 'flex';
+            document.body.style.overflow = 'hidden'; // 禁止底層捲動
+        }
+
+        function closeViewer() {
+            document.getElementById('viewerOverlay').style.display = 'none';
+            document.getElementById('viewerFrame').src = ""; // 停止播放
+            document.body.style.overflow = 'auto';
         }
 
         async function uploadFile() {
             const fileInput = document.getElementById('fileInput');
-            if (!fileInput.files[0]) return alert("請選取檔案");
+            if (!fileInput.files[0]) return alert("請選檔案");
             const btn = document.getElementById('uploadBtn');
             btn.innerText = "傳送中..."; btn.disabled = true;
             const reader = new FileReader();
             reader.onload = async function(e) {
                 try {
-                    const payload = { fileName: fileInput.files[0].name, fileData: e.target.result };
-                    await fetch(gasUrl, { method: "POST", body: JSON.stringify(payload) });
-                    alert("上傳成功！審核後會出現。");
+                    await fetch(gasUrl, { method: "POST", body: JSON.stringify({ fileName: fileInput.files[0].name, fileData: e.target.result }) });
+                    alert("上傳成功！");
                     fileInput.value = "";
-                } catch (err) { alert("上傳失敗"); }
+                } catch (err) { alert("出錯了"); }
                 finally { btn.innerText = "送出"; btn.disabled = false; }
             };
             reader.readAsDataURL(fileInput.files[0]);
         }
-
         initLIFF();
     </script>
 </body>
