@@ -14,7 +14,7 @@
             display: flex; flex-direction: column; align-items: center;
         }
 
-        /* 標題與基礎樣式 */
+        /* 標題區 */
         .header-box { text-align: center; width: 100%; max-width: 500px; margin-bottom: 20px; }
         
         /* 浮動按鈕區 */
@@ -24,15 +24,15 @@
         }
 
         .fab {
-            width: 50px; height: 50px; border-radius: 50%;
+            width: 55px; height: 55px; border-radius: 50%;
             background-color: #5d4037; color: #e5d3b3;
-            border: 2px solid #e5d3b3; box-shadow: 2px 4px 10px rgba(0,0,0,0.3);
+            border: 2px solid #e5d3b3; box-shadow: 2px 4px 10px rgba(0,0,0,0.4);
             display: flex; align-items: center; justify-content: center;
-            font-size: 14px; font-weight: bold; cursor: pointer;
+            font-size: 13px; font-weight: bold; cursor: pointer;
             text-align: center; line-height: 1.2;
         }
 
-        /* 相簿列表 */
+        /* 相簿列表 (首頁) */
         .album-grid { 
             display: grid; grid-template-columns: repeat(2, 1fr); 
             gap: 20px; width: 100%; max-width: 600px; 
@@ -46,7 +46,7 @@
         .album-cover { width: 100%; height: 120px; object-fit: cover; background: #ddd; border: 1px solid #ccc; }
         .album-title { margin-top: 10px; font-weight: bold; font-size: 14px; }
 
-        /* 照片網格 */
+        /* 照片與影片網格 (內頁) */
         .photo-grid { 
             display: none; grid-template-columns: repeat(2, 1fr); 
             gap: 15px; width: 100%; 
@@ -55,11 +55,18 @@
         .photo-item {
             background: white; padding: 8px 8px 10px 8px;
             box-shadow: 3px 3px 10px rgba(0,0,0,0.2); border: 1px solid #eee;
-            display: flex; flex-direction: column;
+            display: flex; flex-direction: column; position: relative;
         }
 
-        .photo-item img, .photo-item video { 
-            width: 100%; height: 150px; object-fit: cover; background: #000; 
+        .photo-item img { 
+            width: 100%; height: 150px; object-fit: cover; background: #eee; 
+        }
+
+        /* 影片播放圖示遮罩 */
+        .video-overlay {
+            position: absolute; top: 8px; left: 8px; right: 8px; height: 150px;
+            background: rgba(0,0,0,0.4); display: flex; align-items: center;
+            justify-content: center; color: white; font-size: 40px; cursor: pointer;
         }
 
         #uploadSection {
@@ -98,6 +105,7 @@
 
         let allData = { categories: [], allFiles: [] };
 
+        // 提取 ID 工具
         function getFileId(url) {
             let id = "";
             if (url.includes('id=')) {
@@ -169,17 +177,23 @@
                 const div = document.createElement('div');
                 div.className = 'photo-item';
                 const fid = getFileId(item.url);
+                const thumbUrl = `https://drive.google.com/thumbnail?id=${fid}&sz=w600`;
+                const openUrl = `https://drive.google.com/open?id=${fid}`;
                 
-                let media = "";
                 if (item.type.includes('video')) {
-                    const videoUrl = `https://drive.google.com/uc?export=download&id=${fid}`;
-                    media = `<video controls playsinline preload="metadata"><source src="${videoUrl}"></video>`;
+                    // 影片：顯示縮圖 + 播放按鈕遮罩，點擊調用 Google 播放器解決大檔案問題
+                    div.innerHTML = `
+                        <div class="video-overlay" onclick="window.open('${openUrl}')">▶</div>
+                        <img src="${thumbUrl}">
+                        <p style="font-size:11px; text-align:center; margin-top:5px; color:#5d4037;">${item.name} (影片)</p>
+                    `;
                 } else {
-                    const thumbUrl = `https://drive.google.com/thumbnail?id=${fid}&sz=w600`;
-                    media = `<img src="${thumbUrl}" loading="lazy" onclick="window.open('https://drive.google.com/open?id=${fid}')">`;
+                    // 照片：支援 HEIC/JPG 縮圖
+                    div.innerHTML = `
+                        <img src="${thumbUrl}" loading="lazy" onclick="window.open('${openUrl}')">
+                        <p style="font-size:11px; text-align:center; margin-top:5px; color:#5d4037;">${item.name}</p>
+                    `;
                 }
-                
-                div.innerHTML = `${media}<p style="font-size:11px; text-align:center; margin-top:5px;">${item.name}</p>`;
                 photoGrid.appendChild(div);
             });
             window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -201,7 +215,7 @@
                     await fetch(gasUrl, { method: "POST", body: JSON.stringify(payload) });
                     alert("上傳成功！審核後會出現。");
                     fileInput.value = "";
-                } catch (err) { alert("失敗"); }
+                } catch (err) { alert("上傳失敗"); }
                 finally { btn.innerText = "送出"; btn.disabled = false; }
             };
             reader.readAsDataURL(fileInput.files[0]);
