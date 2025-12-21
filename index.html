@@ -33,14 +33,10 @@
             box-shadow: 5px 5px 0px #5d4037; cursor: pointer; text-align: center;
         }
 
-        .album-cover {
-            width: 100%; height: 120px; object-fit: cover; 
-            background: #eee; border: 1px solid #ccc;
-        }
-
+        .album-cover { width: 100%; height: 120px; object-fit: cover; background: #ddd; border: 1px solid #ccc; }
         .album-title { margin-top: 10px; font-weight: bold; font-size: 14px; }
 
-        /* 照片/影片網格 (內頁) */
+        /* 照片與影片網格 */
         .photo-grid { 
             display: none; grid-template-columns: repeat(2, 1fr); 
             gap: 15px; width: 100%; 
@@ -56,11 +52,11 @@
             width: 100%; height: 150px; object-fit: cover; background: #000; 
         }
 
-        /* 上傳區 */
         #uploadSection {
             background: rgba(255, 254, 240, 0.9); padding: 15px; 
             margin-bottom: 25px; border: 2px solid #5d4037; width: 90%; max-width: 350px; text-align: center;
         }
+        #loading { font-style: italic; color: #8d6e63; margin-top: 20px; }
     </style>
 </head>
 <body>
@@ -76,7 +72,7 @@
         <button onclick="uploadFile()" id="uploadBtn" style="width:100%; background:#5d4037; color:#e5d3b3; border:none; padding:10px; cursor:pointer; font-weight:bold; margin-top:10px;">送出</button>
     </div>
 
-    <div id="loading">⏳ 正在翻閱相簿...</div>
+    <div id="loading">正在翻閱相簿...</div>
 
     <div id="albumGrid" class="album-grid"></div>
     <div id="photoGrid" class="photo-grid"></div>
@@ -86,6 +82,18 @@
         const liffId = '2008678090-ZMqCkYFi'; 
 
         let allData = { categories: [], allFiles: [] };
+
+        // 輔助工具：從 Google Drive 網址抓取 ID
+        function getFileId(url) {
+            let id = "";
+            if (url.includes('id=')) {
+                id = url.split('id=')[1].split('&')[0];
+            } else {
+                const match = url.match(/\/d\/(.+?)\//);
+                if (match) id = match[1];
+            }
+            return id;
+        }
 
         async function initLIFF() {
             try {
@@ -106,7 +114,7 @@
                 document.getElementById('loading').style.display = 'none';
                 showAlbumList();
             } catch (err) {
-                document.getElementById('loading').innerText = "連線失敗";
+                document.getElementById('loading').innerText = "載入失敗，請檢查網路。";
             }
         }
 
@@ -120,15 +128,15 @@
             allData.categories.forEach(cat => {
                 const photosInCat = allData.allFiles.filter(p => String(p.category) === String(cat.name));
                 const first = photosInCat[0];
-                // 封面如果是影片，就顯示一個預設圖或縮圖
-                const coverUrl = first ? first.url.replace('open?id=', 'thumbnail?id=') + '&sz=w400' : '';
+                const fid = first ? getFileId(first.url) : "";
+                const coverUrl = fid ? `https://drive.google.com/thumbnail?id=${fid}&sz=w400` : "";
 
                 const card = document.createElement('div');
                 card.className = 'album-card';
                 card.onclick = () => showPhotos(cat.name);
                 card.innerHTML = `
                     <img class="album-cover" src="${coverUrl}">
-                    <div class="album-title">${cat.name}</div>
+                    <div class="album-title">${cat.name} (${photosInCat.length}張)</div>
                 `;
                 albumGrid.appendChild(card);
             });
@@ -146,20 +154,15 @@
             filtered.forEach(item => {
                 const div = document.createElement('div');
                 div.className = 'photo-item';
+                const fid = getFileId(item.url);
                 
                 let media = "";
                 if (item.type.includes('video')) {
-                    // 影片播放邏輯：使用直接串流連結
-                    const videoUrl = item.url.replace('open?id=', 'uc?export=download&id=');
-                    media = `
-                        <video controls playsinline preload="metadata">
-                            <source src="${videoUrl}" type="${item.type}">
-                            您的瀏覽器不支援播放此影片
-                        </video>`;
+                    const videoUrl = `https://drive.google.com/uc?export=download&id=${fid}`;
+                    media = `<video controls playsinline><source src="${videoUrl}"></video>`;
                 } else {
-                    // 照片邏輯：使用縮圖技術 (支援 HEIC/JPG)
-                    const thumbUrl = item.url.replace('open?id=', 'thumbnail?id=') + '&sz=w800';
-                    media = `<img src="${thumbUrl}" loading="lazy" onclick="window.open('${item.url}')">`;
+                    const thumbUrl = `https://drive.google.com/thumbnail?id=${fid}&sz=w600`;
+                    media = `<img src="${thumbUrl}" loading="lazy" onclick="window.open('https://drive.google.com/open?id=${fid}')">`;
                 }
                 
                 div.innerHTML = `${media}<p style="font-size:11px; text-align:center; margin-top:5px;">${item.name}</p>`;
@@ -168,9 +171,9 @@
             window.scrollTo(0, 0);
         }
 
-        function uploadFile() {
+        async function uploadFile() {
             const fileInput = document.getElementById('fileInput');
-            if (!fileInput.files[0]) return alert("請選擇檔案");
+            if (!fileInput.files[0]) return alert("請選取檔案");
             const btn = document.getElementById('uploadBtn');
             btn.innerText = "傳送中..."; btn.disabled = true;
             const reader = new FileReader();
