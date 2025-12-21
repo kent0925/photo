@@ -17,11 +17,12 @@
         /* 標題與導覽 */
         .header-box { text-align: center; width: 100%; max-width: 500px; margin-bottom: 20px; }
         #backBtn { 
-            display: none; background: #8d6e63; color: white; border: none; 
-            padding: 8px 15px; border-radius: 5px; cursor: pointer; margin-bottom: 10px;
+            display: none; background: #5d4037; color: #e5d3b3; border: none; 
+            padding: 10px 20px; border-radius: 5px; cursor: pointer; margin-bottom: 15px;
+            font-weight: bold; font-size: 16px; box-shadow: 3px 3px 0px #8d6e63;
         }
 
-        /* 相簿列表樣式 (首頁) */
+        /* 相簿列表 (首頁) */
         .album-grid { 
             display: grid; grid-template-columns: repeat(2, 1fr); 
             gap: 20px; width: 100%; max-width: 600px; 
@@ -34,24 +35,28 @@
 
         .album-cover {
             width: 100%; height: 120px; object-fit: cover; 
-            background: #ddd; border: 1px solid #ccc;
+            background: #eee; border: 1px solid #ccc;
         }
 
-        .album-title { margin-top: 8px; font-weight: bold; font-size: 14px; }
+        .album-title { margin-top: 10px; font-weight: bold; font-size: 14px; }
 
-        /* 照片網格樣式 (內頁) */
+        /* 照片/影片網格 (內頁) */
         .photo-grid { 
             display: none; grid-template-columns: repeat(2, 1fr); 
             gap: 15px; width: 100%; 
         }
 
         .photo-item {
-            background: white; padding: 8px 8px 25px 8px;
+            background: white; padding: 8px 8px 10px 8px;
             box-shadow: 3px 3px 10px rgba(0,0,0,0.2); border: 1px solid #eee;
+            display: flex; flex-direction: column;
         }
 
-        .photo-item img, .photo-item video { width: 100%; height: 150px; object-fit: cover; }
+        .photo-item img, .photo-item video { 
+            width: 100%; height: 150px; object-fit: cover; background: #000; 
+        }
 
+        /* 上傳區 */
         #uploadSection {
             background: rgba(255, 254, 240, 0.9); padding: 15px; 
             margin-bottom: 25px; border: 2px solid #5d4037; width: 90%; max-width: 350px; text-align: center;
@@ -61,20 +66,19 @@
 <body>
 
     <div class="header-box">
-        <h2 id="userName">🎞️ 時光機載入中...</h2>
+        <h2 id="userName">🎞️ 載入回憶中...</h2>
         <button id="backBtn" onclick="showAlbumList()">← 返回相簿列表</button>
     </div>
 
     <div id="uploadSection">
-        <h4 style="margin:0;">投稿新照片</h4>
+        <h4 style="margin:0;">投稿新回憶</h4>
         <input type="file" id="fileInput" accept="image/*,video/*">
-        <button onclick="uploadFile()" id="uploadBtn" style="width:100%; background:#5d4037; color:#e5d3b3; border:none; padding:10px; cursor:pointer;">送出</button>
+        <button onclick="uploadFile()" id="uploadBtn" style="width:100%; background:#5d4037; color:#e5d3b3; border:none; padding:10px; cursor:pointer; font-weight:bold; margin-top:10px;">送出</button>
     </div>
 
-    <div id="loading">正在開啟相簿...</div>
+    <div id="loading">⏳ 正在翻閱相簿...</div>
 
     <div id="albumGrid" class="album-grid"></div>
-
     <div id="photoGrid" class="photo-grid"></div>
 
     <script>
@@ -102,11 +106,10 @@
                 document.getElementById('loading').style.display = 'none';
                 showAlbumList();
             } catch (err) {
-                document.getElementById('loading').innerText = "載入失敗";
+                document.getElementById('loading').innerText = "連線失敗";
             }
         }
 
-        // 顯示「相簿列表」首頁
         function showAlbumList() {
             document.getElementById('backBtn').style.display = 'none';
             document.getElementById('photoGrid').style.display = 'none';
@@ -115,9 +118,10 @@
             albumGrid.innerHTML = "";
 
             allData.categories.forEach(cat => {
-                // 找該分類的第一張照片當封面
-                const coverPhoto = allData.allFiles.find(p => String(p.category) === String(cat.name));
-                const coverUrl = coverPhoto ? coverPhoto.url : 'https://placehold.co/150x120?text=No+Photo';
+                const photosInCat = allData.allFiles.filter(p => String(p.category) === String(cat.name));
+                const first = photosInCat[0];
+                // 封面如果是影片，就顯示一個預設圖或縮圖
+                const coverUrl = first ? first.url.replace('open?id=', 'thumbnail?id=') + '&sz=w400' : '';
 
                 const card = document.createElement('div');
                 card.className = 'album-card';
@@ -130,7 +134,6 @@
             });
         }
 
-        // 顯示「獨立相簿」內頁
         function showPhotos(categoryName) {
             document.getElementById('albumGrid').style.display = 'none';
             document.getElementById('backBtn').style.display = 'inline-block';
@@ -143,9 +146,21 @@
             filtered.forEach(item => {
                 const div = document.createElement('div');
                 div.className = 'photo-item';
-                let media = item.type.includes('video') 
-                    ? `<video src="${item.url}" muted playsinline onmouseover="this.play()" onmouseout="this.pause()"></video>`
-                    : `<img src="${item.url}" loading="lazy" onerror="this.src='https://placehold.co/150x150?text=HEIC'">`;
+                
+                let media = "";
+                if (item.type.includes('video')) {
+                    // 影片播放邏輯：使用直接串流連結
+                    const videoUrl = item.url.replace('open?id=', 'uc?export=download&id=');
+                    media = `
+                        <video controls playsinline preload="metadata">
+                            <source src="${videoUrl}" type="${item.type}">
+                            您的瀏覽器不支援播放此影片
+                        </video>`;
+                } else {
+                    // 照片邏輯：使用縮圖技術 (支援 HEIC/JPG)
+                    const thumbUrl = item.url.replace('open?id=', 'thumbnail?id=') + '&sz=w800';
+                    media = `<img src="${thumbUrl}" loading="lazy" onclick="window.open('${item.url}')">`;
+                }
                 
                 div.innerHTML = `${media}<p style="font-size:11px; text-align:center; margin-top:5px;">${item.name}</p>`;
                 photoGrid.appendChild(div);
@@ -155,13 +170,14 @@
 
         function uploadFile() {
             const fileInput = document.getElementById('fileInput');
-            if (!fileInput.files[0]) return alert("請選取檔案");
+            if (!fileInput.files[0]) return alert("請選擇檔案");
             const btn = document.getElementById('uploadBtn');
             btn.innerText = "傳送中..."; btn.disabled = true;
             const reader = new FileReader();
             reader.onload = async function(e) {
                 try {
-                    await fetch(gasUrl, { method: "POST", body: JSON.stringify({ fileName: fileInput.files[0].name, fileData: e.target.result }) });
+                    const payload = { fileName: fileInput.files[0].name, fileData: e.target.result };
+                    await fetch(gasUrl, { method: "POST", body: JSON.stringify(payload) });
                     alert("上傳成功！審核後會出現。");
                     fileInput.value = "";
                 } catch (err) { alert("失敗"); }
