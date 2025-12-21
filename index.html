@@ -47,4 +47,149 @@
     <div id="uploadSection">
         <h4 style="margin:0;">投稿新照片</h4>
         <input type="file" id="fileInput" accept="image/*,video/*">
-        <button onclick="uploadFile()" id="uploadBtn" style="width:100%; background:#5d4037; color:#e5d3b3; border:none;
+        <button onclick="uploadFile()" id="uploadBtn" style="width:100%; background:#5d4037; color:#e5d3b3; border:none; padding:10px; cursor:pointer; font-weight:bold; margin-top:10px;">送出</button>
+    </div>
+
+    <div id="loading">正在開啟相簿...</div>
+
+    <div id="albumGrid" class="grid-container"></div>
+    <div id="photoGrid" class="grid-container" style="display:none;"></div>
+
+    <div id="viewerOverlay">
+        <div id="viewerContent">
+            <span id="closeBtn" onclick="closeViewer()">✕</span>
+            </div>
+    </div>
+
+    <div id="floatingMenu" class="floating-menu">
+        <div class="fab" onclick="window.scrollTo({top:0, behavior:'smooth'})">TOP</div>
+        <div class="fab" onclick="showAlbumList()">返回<br>列表</div>
+    </div>
+
+    <script>
+        const gasUrl = 'https://script.google.com/macros/s/AKfycbyBsFLlYt415vWiBipXhvycp_OMoQAJZdtfBi85IvQ29sfyCQphy6P0RrhMndpoLT33/exec'; 
+        const liffId = '2008678090-ZMqCkYFi'; 
+        let allData = { categories: [], allFiles: [] };
+
+        function getFileId(url) {
+            let id = "";
+            if (url.includes('id=')) id = url.split('id=')[1].split('&')[0];
+            else { const match = url.match(/\/d\/(.+?)\//); if (match) id = match[1]; }
+            return id;
+        }
+
+        async function initLIFF() {
+            try {
+                await liff.init({ liffId });
+                if (!liff.isLoggedIn()) liff.login();
+                else {
+                    const profile = await liff.getProfile();
+                    document.getElementById('userName').innerText = `📽️ ${profile.displayName} 的相簿`;
+                    fetchData();
+                }
+            } catch (err) { fetchData(); }
+        }
+
+        async function fetchData() {
+            try {
+                const response = await fetch(gasUrl);
+                allData = await response.json();
+                document.getElementById('loading').style.display = 'none';
+                showAlbumList();
+            } catch (err) { document.getElementById('loading').innerText = "載入失敗"; }
+        }
+
+        function showAlbumList() {
+            document.getElementById('floatingMenu').style.display = 'none';
+            document.getElementById('photoGrid').style.display = 'none';
+            const albumGrid = document.getElementById('albumGrid');
+            albumGrid.style.display = 'grid';
+            albumGrid.innerHTML = "";
+
+            allData.categories.forEach(cat => {
+                const photos = allData.allFiles.filter(p => String(p.category) === String(cat.name));
+                const fid = photos[0] ? getFileId(photos[0].url) : "";
+                const coverUrl = fid ? `https://drive.google.com/thumbnail?id=${fid}&sz=w400` : "";
+                const div = document.createElement('div');
+                div.className = 'card';
+                div.onclick = () => showPhotos(cat.name);
+                div.innerHTML = `<img src="${coverUrl}"><div style="font-size:12px;margin-top:5px;">${cat.name}</div>`;
+                albumGrid.appendChild(div);
+            });
+        }
+
+        function showPhotos(catName) {
+            document.getElementById('albumGrid').style.display = 'none';
+            document.getElementById('floatingMenu').style.display = 'flex';
+            const photoGrid = document.getElementById('photoGrid');
+            photoGrid.style.display = 'grid';
+            photoGrid.innerHTML = "";
+
+            allData.allFiles.filter(p => String(p.category) === String(catName)).forEach(item => {
+                const fid = getFileId(item.url);
+                const thumb = `https://drive.google.com/thumbnail?id=${fid}&sz=w600`;
+                const isVideo = item.type.includes('video');
+                
+                const div = document.createElement('div');
+                div.className = 'photo-item';
+                div.onclick = () => openViewer(fid, isVideo);
+                
+                let icon = isVideo ? '<div class="video-label">▶</div>' : '';
+                div.innerHTML = `${icon}<img src="${thumb}"><p style="font-size:10px;text-align:center;margin-top:5px;">${item.name}</p>`;
+                photoGrid.appendChild(div);
+            });
+            window.scrollTo(0,0);
+        }
+
+        function openViewer(id, isVideo) {
+            const content = document.getElementById('viewerContent');
+            const overlay = document.getElementById('viewerOverlay');
+            
+            // 清空內容並保留關閉鈕
+            content.innerHTML = '<span id="closeBtn" onclick="closeViewer()">✕</span>';
+
+            if (isVideo) {
+                // 影片改用按鈕跳轉播放，避開內嵌限制
+                content.innerHTML += `
+                    <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; height:100%; color:white; text-align:center;">
+                        <img src="https://drive.google.com/thumbnail?id=${id}&sz=w600" style="width:80%; border-radius:10px; margin-bottom:20px;">
+                        <button onclick="window.open('https://drive.google.com/file/d/${id}/view')" 
+                                style="background:#5d4037; color:#e5d3b3; border:none; padding:15px 40px; border-radius:30px; font-weight:bold; cursor:pointer; font-size:18px;">
+                            立即播放影片 ▶
+                        </button>
+                        <p style="font-size:12px; margin-top:15px; opacity:0.7;">影片將在 Google 播放器中開啟</p>
+                    </div>`;
+            } else {
+                // 照片直接用 img，100% 成功
+                content.innerHTML += `<img src="https://drive.google.com/thumbnail?id=${id}&sz=w1200" style="max-width:100%; max-height:100%; object-fit:contain;">`;
+            }
+            
+            overlay.style.display = 'flex';
+            document.body.style.overflow = 'hidden';
+        }
+
+        function closeViewer() {
+            document.getElementById('viewerOverlay').style.display = 'none';
+            document.body.style.overflow = 'auto';
+        }
+
+        async function uploadFile() {
+            const fileInput = document.getElementById('fileInput');
+            if (!fileInput.files[0]) return alert("請選檔案");
+            const btn = document.getElementById('uploadBtn');
+            btn.innerText = "傳送中..."; btn.disabled = true;
+            const reader = new FileReader();
+            reader.onload = async function(e) {
+                try {
+                    await fetch(gasUrl, { method: "POST", body: JSON.stringify({ fileName: fileInput.files[0].name, fileData: e.target.result }) });
+                    alert("上傳成功！");
+                    fileInput.value = "";
+                } catch (err) { alert("出錯了"); }
+                finally { btn.innerText = "送出"; btn.disabled = false; }
+            };
+            reader.readAsDataURL(fileInput.files[0]);
+        }
+        initLIFF();
+    </script>
+</body>
+</html>
