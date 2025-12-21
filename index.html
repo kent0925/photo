@@ -14,58 +14,50 @@
             display: flex; flex-direction: column; align-items: center;
         }
 
-        /* 標題區 */
         .header-box { text-align: center; width: 100%; max-width: 500px; margin-bottom: 20px; }
         
-        /* 浮動按鈕區 */
+        /* 浮動按鈕 */
         .floating-menu {
             position: fixed; bottom: 25px; right: 20px;
             display: none; flex-direction: column; gap: 12px; z-index: 999;
         }
-
         .fab {
             width: 55px; height: 55px; border-radius: 50%;
             background-color: #5d4037; color: #e5d3b3;
             border: 2px solid #e5d3b3; box-shadow: 2px 4px 10px rgba(0,0,0,0.4);
             display: flex; align-items: center; justify-content: center;
-            font-size: 13px; font-weight: bold; cursor: pointer;
-            text-align: center; line-height: 1.2;
+            font-size: 13px; font-weight: bold; cursor: pointer; text-align: center;
         }
 
-        /* 相簿列表 (首頁) */
+        /* 相簿目錄卡片 - 調整寬度 */
         .album-grid { 
             display: grid; grid-template-columns: repeat(2, 1fr); 
-            gap: 20px; width: 100%; max-width: 600px; 
+            gap: 15px; width: 100%; max-width: 400px; 
         }
-
         .album-card {
             background: #fffef0; padding: 10px; border: 1px solid #5d4037;
-            box-shadow: 5px 5px 0px #5d4037; cursor: pointer; text-align: center;
+            box-shadow: 4px 4px 0px #5d4037; cursor: pointer; text-align: center;
         }
+        .album-cover { width: 100%; aspect-ratio: 1 / 1; object-fit: cover; background: #ddd; border: 1px solid #ccc; }
 
-        .album-cover { width: 100%; height: 120px; object-fit: cover; background: #ddd; border: 1px solid #ccc; }
-        .album-title { margin-top: 10px; font-weight: bold; font-size: 14px; }
-
-        /* 照片與影片網格 (內頁) */
+        /* 照片網格 - 嚴格控制不被拉寬 */
         .photo-grid { 
             display: none; grid-template-columns: repeat(2, 1fr); 
-            gap: 15px; width: 100%; 
+            gap: 15px; width: 100%; max-width: 400px; 
         }
-
         .photo-item {
-            background: white; padding: 8px 8px 10px 8px;
-            box-shadow: 3px 3px 10px rgba(0,0,0,0.2); border: 1px solid #eee;
+            background: white; padding: 10px 10px 25px 10px;
+            box-shadow: 3px 3px 8px rgba(0,0,0,0.15); border: 1px solid #ddd;
             display: flex; flex-direction: column; position: relative;
         }
-
+        /* 強制照片保持方正比例，不隨螢幕寬度變形 */
         .photo-item img { 
-            width: 100%; height: 150px; object-fit: cover; background: #eee; 
+            width: 100%; aspect-ratio: 1 / 1; object-fit: cover; background: #f0f0f0; 
         }
 
-        /* 影片播放圖示遮罩 */
         .video-overlay {
-            position: absolute; top: 8px; left: 8px; right: 8px; height: 150px;
-            background: rgba(0,0,0,0.4); display: flex; align-items: center;
+            position: absolute; top: 10px; left: 10px; right: 10px; aspect-ratio: 1 / 1;
+            background: rgba(0,0,0,0.3); display: flex; align-items: center;
             justify-content: center; color: white; font-size: 40px; cursor: pointer;
         }
 
@@ -83,15 +75,14 @@
     </div>
 
     <div id="uploadSection">
-        <h4 style="margin:0;">投稿新回憶</h4>
+        <h4 style="margin:0;">投稿新照片</h4>
         <input type="file" id="fileInput" accept="image/*,video/*">
-        <button onclick="uploadFile()" id="uploadBtn" style="width:100%; background:#5d4037; color:#e5d3b3; border:none; padding:10px; cursor:pointer; font-weight:bold; margin-top:10px;">送出</button>
+        <button onclick="uploadFile()" id="uploadBtn" style="width:100%; background:#5d4037; color:#e5d3b3; border:none; padding:10px; cursor:pointer; font-weight:bold; margin-top:10px;">送出回憶</button>
     </div>
 
     <div id="loading">正在翻閱相簿...</div>
 
     <div id="albumGrid" class="album-grid"></div>
-
     <div id="photoGrid" class="photo-grid"></div>
 
     <div id="floatingMenu" class="floating-menu">
@@ -105,7 +96,6 @@
 
         let allData = { categories: [], allFiles: [] };
 
-        // 提取 ID 工具
         function getFileId(url) {
             let id = "";
             if (url.includes('id=')) {
@@ -157,7 +147,7 @@
                 card.onclick = () => showPhotos(cat.name);
                 card.innerHTML = `
                     <img class="album-cover" src="${coverUrl}">
-                    <div class="album-title">${cat.name} (${photosInCat.length}張)</div>
+                    <div class="album-title" style="font-size:12px; margin-top:5px;">${cat.name}</div>
                 `;
                 albumGrid.appendChild(card);
             });
@@ -181,17 +171,15 @@
                 const openUrl = `https://drive.google.com/open?id=${fid}`;
                 
                 if (item.type.includes('video')) {
-                    // 影片：顯示縮圖 + 播放按鈕遮罩，點擊調用 Google 播放器解決大檔案問題
                     div.innerHTML = `
                         <div class="video-overlay" onclick="window.open('${openUrl}')">▶</div>
                         <img src="${thumbUrl}">
-                        <p style="font-size:11px; text-align:center; margin-top:5px; color:#5d4037;">${item.name} (影片)</p>
+                        <p style="font-size:10px; text-align:center; margin-top:5px;">(影片回憶)</p>
                     `;
                 } else {
-                    // 照片：支援 HEIC/JPG 縮圖
                     div.innerHTML = `
                         <img src="${thumbUrl}" loading="lazy" onclick="window.open('${openUrl}')">
-                        <p style="font-size:11px; text-align:center; margin-top:5px; color:#5d4037;">${item.name}</p>
+                        <p style="font-size:10px; text-align:center; margin-top:5px;">${item.name}</p>
                     `;
                 }
                 photoGrid.appendChild(div);
