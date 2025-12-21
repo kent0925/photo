@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>社團懷舊時光機</title>
+    <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+    <style>
+        /* 復古背景：使用米黃色或牛皮紙色 */
+        body { 
+            background-color: #e5d3b3; 
+            background-image: url('https://www.transparenttextures.com/patterns/paper-fibers.png');
+            font-family: "Courier New", Courier, monospace;
+            color: #5d4037;
+            margin: 0;
+            padding: 20px;
+        }
+
+        h2 {
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.2);
+            border-bottom: 2px dashed #5d4037;
+            display: inline-block;
+            padding-bottom: 10px;
+        }
+
+        .gallery { 
+            display: flex; 
+            flex-wrap: wrap; 
+            justify-content: center; 
+            gap: 30px; 
+            padding-top: 30px; 
+        }
+
+        /* 拍立得照片風格 */
+        .item { 
+            background: #fffef0; 
+            padding: 15px 15px 40px 15px; /* 底部留白寫字 */
+            box-shadow: 5px 5px 15px rgba(0,0,0,0.3);
+            border: 1px solid #ddd;
+            transition: transform 0.3s;
+            max-width: 200px;
+        }
+
+        /* 讓照片隨機稍微旋轉，看起來像亂疊的照片 */
+        .item:nth-child(odd) { transform: rotate(-2deg); }
+        .item:nth-child(even) { transform: rotate(3deg); }
+        .item:hover { transform: rotate(0deg) scale(1.1); z-index: 10; }
+
+        .item img, .item video { 
+            width: 100%; 
+            height: 180px;
+            object-fit: cover;
+            /* 復古濾鏡：稍微降低飽和度與增加褐色調 */
+            filter: sepia(30%) contrast(90%);
+            border: 1px solid #999;
+        }
+
+        .item p {
+            margin-top: 15px;
+            font-size: 14px;
+            font-weight: bold;
+            color: #795548;
+            /* 模擬手寫感 */
+            font-family: "Comic Sans MS", cursive, sans-serif; 
+        }
+    </style>
+</head>
+<body>
+    <h2 id="userName">載入回憶中...</h2>
+    <div class="gallery" id="gallery"></div>
+
+    <script>
+        const gasUrl = 'https://script.google.com/macros/s/AKfycbxzkrG6Oycycm40mtetUGOZpclbsETULRx0MRLFr8E/dev'; 
+
+        async function main() {
+            await liff.init({ liffId: "你的_LIFF_ID" });
+            if (!liff.isLoggedIn()) {
+                liff.login();
+            } else {
+                const profile = await liff.getProfile();
+                document.getElementById('userName').innerText = `🎞️ ${profile.displayName} 的舊時光`;
+                fetchData();
+            }
+        }
+
+        async function fetchData() {
+            try {
+                const response = await fetch(gasUrl);
+                const data = await response.json();
+                const gallery = document.getElementById('gallery');
+                
+                data.forEach(item => {
+                    const div = document.createElement('div');
+                    div.className = 'item';
+                    if (item.type.includes('image')) {
+                        div.innerHTML = `<img src="${item.url}"><p>${item.name.split('.')[0]}</p>`;
+                    } else {
+                        div.innerHTML = `<video controls src="${item.url}"></video><p>${item.name.split('.')[0]}</p>`;
+                    }
+                    gallery.appendChild(div);
+                });
+            } catch (e) {
+                console.error("資料載入失敗", e);
+            }
+        }
+        main();
+    </script>
+</body>
+</html>
