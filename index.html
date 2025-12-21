@@ -53,11 +53,17 @@
 
         .item img, .item video { 
             width: 100%; height: 150px; object-fit: cover;
-            filter: sepia(20%) contrast(95%); border: 1px solid #ccc;
+            filter: sepia(10%) contrast(95%); border: 1px solid #ccc;
+            background: #eee;
         }
 
-        .item p {
-            margin: 10px 0 0 0; font-size: 13px; font-weight: bold;
+        .category-tag {
+            font-size: 10px; color: #8d6e63; margin: 8px 0 2px 0;
+            font-weight: bold; text-align: center;
+        }
+
+        .file-name {
+            margin: 0; font-size: 12px;
             color: #795548; text-align: center;
             overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
         }
@@ -80,7 +86,6 @@
     <div class="gallery" id="gallery"></div>
 
     <script>
-        // --- ⚙️ 請修改這裡 ---
         const gasUrl = 'https://script.google.com/macros/s/AKfycbyBsFLlYt415vWiBipXhvycp_OMoQAJZdtfBi85IvQ29sfyCQphy6P0RrhMndpoLT33/exec'; 
         const liffId = '2008678090-ZMqCkYFi'; 
 
@@ -104,32 +109,51 @@
             }
         }
 
-        // 2. 抓取「整理好」的照片 (doGet)
+        // 2. 抓取照片 (支援物件格式)
         async function fetchData() {
             try {
                 const response = await fetch(gasUrl);
-                const files = await response.json();
+                const data = await response.json();
+                
+                // 關鍵：從回傳物件中提取 allFiles 陣列
+                const files = data.allFiles || [];
                 
                 document.getElementById('loading').style.display = 'none';
                 const gallery = document.getElementById('gallery');
                 gallery.innerHTML = "";
                 
+                if (files.length === 0) {
+                    document.getElementById('loading').innerText = "相簿目前是空的，請管理員移動照片。";
+                    document.getElementById('loading').style.display = 'block';
+                    return;
+                }
+
                 files.forEach(item => {
                     const div = document.createElement('div');
                     div.className = 'item';
-                    if (item.type.includes('image')) {
-                        div.innerHTML = `<img src="${item.url}"><p>${item.name}</p>`;
+                    
+                    let mediaTag = "";
+                    if (item.type.includes('video')) {
+                        mediaTag = `<video src="${item.url}" muted playsinline onmouseover="this.play()" onmouseout="this.pause()"></video>`;
                     } else {
-                        div.innerHTML = `<video src="${item.url}" muted onmouseover="this.play()" onmouseout="this.pause()"></video><p>${item.name}</p>`;
+                        // 處理 HEIC 或不支援格式的提示
+                        mediaTag = `<img src="${item.url}" loading="lazy" onerror="this.src='https://placehold.co/160x150?text=HEIC+Format'">`;
                     }
+
+                    div.innerHTML = `
+                        ${mediaTag}
+                        <p class="category-tag">[ ${item.category} ]</p>
+                        <p class="file-name">${item.name}</p>
+                    `;
                     gallery.appendChild(div);
                 });
             } catch (err) {
-                document.getElementById('loading').innerText = "載入失敗，請確認 GAS 權限。";
+                console.error(err);
+                document.getElementById('loading').innerText = "載入失敗，請確認 GAS 權限設定。";
             }
         }
 
-        // 3. 上傳到「待分類」資料夾 (doPost)
+        // 3. 上傳檔案
         function uploadFile() {
             const fileInput = document.getElementById('fileInput');
             if (!fileInput.files[0]) return alert("請先選取檔案！");
@@ -149,14 +173,14 @@
                 };
 
                 try {
-                    const resp = await fetch(gasUrl, {
+                    await fetch(gasUrl, {
                         method: "POST",
                         body: JSON.stringify(payload)
                     });
-                    alert("上傳成功！管理員審核後會出現在相簿中。");
-                    fileInput.value = ""; // 清空選擇
+                    alert("上傳成功！管理員審核後會出現。");
+                    fileInput.value = "";
                 } catch (err) {
-                    alert("上傳失敗，請再試一次。");
+                    alert("上傳失敗，請檢查網路。");
                 } finally {
                     btn.innerText = "送出回憶";
                     btn.disabled = false;
