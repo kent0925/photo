@@ -1,109 +1,171 @@
 <!DOCTYPE html>
-<html>
+<html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>社團懷舊時光機</title>
+    <title>社團復古時光機</title>
     <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
     <style>
-        /* 復古背景：使用米黃色或牛皮紙色 */
+        /* 復古視覺風格 */
         body { 
             background-color: #e5d3b3; 
             background-image: url('https://www.transparenttextures.com/patterns/paper-fibers.png');
-            font-family: "Courier New", Courier, monospace;
+            font-family: "Courier New", Courier, "Microsoft JhengHei", monospace;
             color: #5d4037;
-            margin: 0;
-            padding: 20px;
+            margin: 0; padding: 20px;
+            display: flex; flex-direction: column; align-items: center;
         }
 
-        h2 {
-            text-shadow: 1px 1px 2px rgba(0,0,0,0.2);
-            border-bottom: 2px dashed #5d4037;
-            display: inline-block;
-            padding-bottom: 10px;
+        h2 { text-shadow: 1px 1px 2px rgba(0,0,0,0.2); border-bottom: 2px dashed #5d4037; padding-bottom: 10px; }
+
+        /* 上傳區塊 */
+        #uploadSection {
+            background: rgba(255, 254, 240, 0.9);
+            padding: 20px; margin-bottom: 30px;
+            border: 2px solid #5d4037;
+            box-shadow: 8px 8px 0px #5d4037;
+            width: 90%; max-width: 350px; text-align: center;
         }
 
-        .gallery { 
-            display: flex; 
-            flex-wrap: wrap; 
-            justify-content: center; 
-            gap: 30px; 
-            padding-top: 30px; 
+        input[type="file"] { width: 100%; margin: 15px 0; }
+
+        button {
+            background-color: #5d4037; color: #e5d3b3;
+            width: 100%; padding: 12px; border: none;
+            font-weight: bold; cursor: pointer; font-size: 16px;
         }
 
-        /* 拍立得照片風格 */
+        button:disabled { background-color: #999; }
+
+        /* 相簿展示區 (拍立得風格) */
+        .gallery { display: flex; flex-wrap: wrap; justify-content: center; gap: 25px; width: 100%; }
+
         .item { 
-            background: #fffef0; 
-            padding: 15px 15px 40px 15px; /* 底部留白寫字 */
+            background: #fffef0; padding: 12px 12px 35px 12px;
             box-shadow: 5px 5px 15px rgba(0,0,0,0.3);
-            border: 1px solid #ddd;
+            border: 1px solid #ddd; width: 160px;
             transition: transform 0.3s;
-            max-width: 200px;
         }
 
-        /* 讓照片隨機稍微旋轉，看起來像亂疊的照片 */
         .item:nth-child(odd) { transform: rotate(-2deg); }
-        .item:nth-child(even) { transform: rotate(3deg); }
-        .item:hover { transform: rotate(0deg) scale(1.1); z-index: 10; }
+        .item:nth-child(even) { transform: rotate(2deg); }
+        .item:hover { transform: rotate(0deg) scale(1.1); z-index: 5; }
 
         .item img, .item video { 
-            width: 100%; 
-            height: 180px;
-            object-fit: cover;
-            /* 復古濾鏡：稍微降低飽和度與增加褐色調 */
-            filter: sepia(30%) contrast(90%);
-            border: 1px solid #999;
+            width: 100%; height: 150px; object-fit: cover;
+            filter: sepia(20%) contrast(95%); border: 1px solid #ccc;
         }
 
         .item p {
-            margin-top: 15px;
-            font-size: 14px;
-            font-weight: bold;
-            color: #795548;
-            /* 模擬手寫感 */
-            font-family: "Comic Sans MS", cursive, sans-serif; 
+            margin: 10px 0 0 0; font-size: 13px; font-weight: bold;
+            color: #795548; text-align: center;
+            overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
         }
+
+        #loading { font-style: italic; color: #8d6e63; margin-top: 20px; }
     </style>
 </head>
 <body>
-    <h2 id="userName">載入回憶中...</h2>
+
+    <h2 id="userName">🎞️ 載入回憶中...</h2>
+
+    <div id="uploadSection">
+        <h4 style="margin:0;">投稿新照片</h4>
+        <p style="font-size: 12px; color: #8d6e63;">照片將先送至後台管理員審核</p>
+        <input type="file" id="fileInput" accept="image/*,video/*">
+        <button onclick="uploadFile()" id="uploadBtn">送出回憶</button>
+    </div>
+
+    <div id="loading">正在翻閱相簿...</div>
     <div class="gallery" id="gallery"></div>
 
     <script>
-        const gasUrl = 'https://script.google.com/macros/s/AKfycbxzkrG6Oycycm40mtetUGOZpclbsETULRx0MRLFr8E/dev'; 
+        // --- ⚙️ 請修改這裡 ---
+        const gasUrl = 'https://script.google.com/macros/s/AKfycbyBsFLlYt415vWiBipXhvycp_OMoQAJZdtfBi85IvQ29sfyCQphy6P0RrhMndpoLT33/exec'; 
+        const liffId = '2008678090-ZMqCkYFi'; 
 
-        async function main() {
-            await liff.init({ liffId: "你的_LIFF_ID" });
-            if (!liff.isLoggedIn()) {
-                liff.login();
-            } else {
-                const profile = await liff.getProfile();
-                document.getElementById('userName').innerText = `🎞️ ${profile.displayName} 的舊時光`;
+        let currentUser = "社團夥伴";
+
+        // 1. 初始化 LIFF
+        async function initLIFF() {
+            try {
+                await liff.init({ liffId: liffId });
+                if (!liff.isLoggedIn()) {
+                    liff.login();
+                } else {
+                    const profile = await liff.getProfile();
+                    currentUser = profile.displayName;
+                    document.getElementById('userName').innerText = `📽️ ${currentUser} 的時光機`;
+                    fetchData();
+                }
+            } catch (err) {
+                console.log("LIFF 載入失敗，可能在一般瀏覽器中運行");
                 fetchData();
             }
         }
 
+        // 2. 抓取「整理好」的照片 (doGet)
         async function fetchData() {
             try {
                 const response = await fetch(gasUrl);
-                const data = await response.json();
-                const gallery = document.getElementById('gallery');
+                const files = await response.json();
                 
-                data.forEach(item => {
+                document.getElementById('loading').style.display = 'none';
+                const gallery = document.getElementById('gallery');
+                gallery.innerHTML = "";
+                
+                files.forEach(item => {
                     const div = document.createElement('div');
                     div.className = 'item';
                     if (item.type.includes('image')) {
-                        div.innerHTML = `<img src="${item.url}"><p>${item.name.split('.')[0]}</p>`;
+                        div.innerHTML = `<img src="${item.url}"><p>${item.name}</p>`;
                     } else {
-                        div.innerHTML = `<video controls src="${item.url}"></video><p>${item.name.split('.')[0]}</p>`;
+                        div.innerHTML = `<video src="${item.url}" muted onmouseover="this.play()" onmouseout="this.pause()"></video><p>${item.name}</p>`;
                     }
                     gallery.appendChild(div);
                 });
-            } catch (e) {
-                console.error("資料載入失敗", e);
+            } catch (err) {
+                document.getElementById('loading').innerText = "載入失敗，請確認 GAS 權限。";
             }
         }
-        main();
+
+        // 3. 上傳到「待分類」資料夾 (doPost)
+        function uploadFile() {
+            const fileInput = document.getElementById('fileInput');
+            if (!fileInput.files[0]) return alert("請先選取檔案！");
+
+            const btn = document.getElementById('uploadBtn');
+            btn.innerText = "傳送中...";
+            btn.disabled = true;
+
+            const file = fileInput.files[0];
+            const reader = new FileReader();
+            
+            reader.onload = async function(e) {
+                const payload = {
+                    userName: currentUser,
+                    fileName: file.name,
+                    fileData: e.target.result
+                };
+
+                try {
+                    const resp = await fetch(gasUrl, {
+                        method: "POST",
+                        body: JSON.stringify(payload)
+                    });
+                    alert("上傳成功！管理員審核後會出現在相簿中。");
+                    fileInput.value = ""; // 清空選擇
+                } catch (err) {
+                    alert("上傳失敗，請再試一次。");
+                } finally {
+                    btn.innerText = "送出回憶";
+                    btn.disabled = false;
+                }
+            };
+            reader.readAsDataURL(file);
+        }
+
+        initLIFF();
     </script>
 </body>
 </html>
