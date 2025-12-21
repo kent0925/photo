@@ -14,15 +14,25 @@
             display: flex; flex-direction: column; align-items: center;
         }
 
-        /* 標題與導覽 */
+        /* 標題與基礎樣式 */
         .header-box { text-align: center; width: 100%; max-width: 500px; margin-bottom: 20px; }
-        #backBtn { 
-            display: none; background: #5d4037; color: #e5d3b3; border: none; 
-            padding: 10px 20px; border-radius: 5px; cursor: pointer; margin-bottom: 15px;
-            font-weight: bold; font-size: 16px; box-shadow: 3px 3px 0px #8d6e63;
+        
+        /* 浮動按鈕區 */
+        .floating-menu {
+            position: fixed; bottom: 25px; right: 20px;
+            display: none; flex-direction: column; gap: 12px; z-index: 999;
         }
 
-        /* 相簿列表 (首頁) */
+        .fab {
+            width: 50px; height: 50px; border-radius: 50%;
+            background-color: #5d4037; color: #e5d3b3;
+            border: 2px solid #e5d3b3; box-shadow: 2px 4px 10px rgba(0,0,0,0.3);
+            display: flex; align-items: center; justify-content: center;
+            font-size: 14px; font-weight: bold; cursor: pointer;
+            text-align: center; line-height: 1.2;
+        }
+
+        /* 相簿列表 */
         .album-grid { 
             display: grid; grid-template-columns: repeat(2, 1fr); 
             gap: 20px; width: 100%; max-width: 600px; 
@@ -36,7 +46,7 @@
         .album-cover { width: 100%; height: 120px; object-fit: cover; background: #ddd; border: 1px solid #ccc; }
         .album-title { margin-top: 10px; font-weight: bold; font-size: 14px; }
 
-        /* 照片與影片網格 */
+        /* 照片網格 */
         .photo-grid { 
             display: none; grid-template-columns: repeat(2, 1fr); 
             gap: 15px; width: 100%; 
@@ -63,7 +73,6 @@
 
     <div class="header-box">
         <h2 id="userName">🎞️ 載入回憶中...</h2>
-        <button id="backBtn" onclick="showAlbumList()">← 返回相簿列表</button>
     </div>
 
     <div id="uploadSection">
@@ -75,7 +84,13 @@
     <div id="loading">正在翻閱相簿...</div>
 
     <div id="albumGrid" class="album-grid"></div>
+
     <div id="photoGrid" class="photo-grid"></div>
+
+    <div id="floatingMenu" class="floating-menu">
+        <div class="fab" onclick="scrollToTop()">TOP</div>
+        <div class="fab" onclick="showAlbumList()">返回<br>列表</div>
+    </div>
 
     <script>
         const gasUrl = 'https://script.google.com/macros/s/AKfycbyBsFLlYt415vWiBipXhvycp_OMoQAJZdtfBi85IvQ29sfyCQphy6P0RrhMndpoLT33/exec'; 
@@ -83,7 +98,6 @@
 
         let allData = { categories: [], allFiles: [] };
 
-        // 輔助工具：從 Google Drive 網址抓取 ID
         function getFileId(url) {
             let id = "";
             if (url.includes('id=')) {
@@ -114,12 +128,12 @@
                 document.getElementById('loading').style.display = 'none';
                 showAlbumList();
             } catch (err) {
-                document.getElementById('loading').innerText = "載入失敗，請檢查網路。";
+                document.getElementById('loading').innerText = "載入失敗";
             }
         }
 
         function showAlbumList() {
-            document.getElementById('backBtn').style.display = 'none';
+            document.getElementById('floatingMenu').style.display = 'none';
             document.getElementById('photoGrid').style.display = 'none';
             const albumGrid = document.getElementById('albumGrid');
             albumGrid.style.display = 'grid';
@@ -127,8 +141,7 @@
 
             allData.categories.forEach(cat => {
                 const photosInCat = allData.allFiles.filter(p => String(p.category) === String(cat.name));
-                const first = photosInCat[0];
-                const fid = first ? getFileId(first.url) : "";
+                const fid = photosInCat[0] ? getFileId(photosInCat[0].url) : "";
                 const coverUrl = fid ? `https://drive.google.com/thumbnail?id=${fid}&sz=w400` : "";
 
                 const card = document.createElement('div');
@@ -140,11 +153,12 @@
                 `;
                 albumGrid.appendChild(card);
             });
+            window.scrollTo({ top: 0, behavior: 'smooth' });
         }
 
         function showPhotos(categoryName) {
             document.getElementById('albumGrid').style.display = 'none';
-            document.getElementById('backBtn').style.display = 'inline-block';
+            document.getElementById('floatingMenu').style.display = 'flex';
             const photoGrid = document.getElementById('photoGrid');
             photoGrid.style.display = 'grid';
             photoGrid.innerHTML = "";
@@ -159,7 +173,7 @@
                 let media = "";
                 if (item.type.includes('video')) {
                     const videoUrl = `https://drive.google.com/uc?export=download&id=${fid}`;
-                    media = `<video controls playsinline><source src="${videoUrl}"></video>`;
+                    media = `<video controls playsinline preload="metadata"><source src="${videoUrl}"></video>`;
                 } else {
                     const thumbUrl = `https://drive.google.com/thumbnail?id=${fid}&sz=w600`;
                     media = `<img src="${thumbUrl}" loading="lazy" onclick="window.open('https://drive.google.com/open?id=${fid}')">`;
@@ -168,7 +182,11 @@
                 div.innerHTML = `${media}<p style="font-size:11px; text-align:center; margin-top:5px;">${item.name}</p>`;
                 photoGrid.appendChild(div);
             });
-            window.scrollTo(0, 0);
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        function scrollToTop() {
+            window.scrollTo({ top: 0, behavior: 'smooth' });
         }
 
         async function uploadFile() {
