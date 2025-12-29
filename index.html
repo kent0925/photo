@@ -16,6 +16,7 @@
 
         .hidden-input { display: none; }
 
+        /* 卡片按鍵式設計 */
         .upload-card-btn {
             background: #fffef0; width: 90%; max-width: 350px;
             padding: 20px; margin-bottom: 15px; border: 2px solid #5d4037;
@@ -28,6 +29,7 @@
 
         #globalStatus { font-size: 12px; margin-bottom: 15px; color: #b71c1c; font-weight: bold; text-align: center; min-height: 18px; }
 
+        /* 相簿網格系統 */
         .grid-container { display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; width: 100%; max-width: 400px; }
         .card { background: #fffef0; padding: 10px; border: 1px solid #5d4037; cursor: pointer; text-align: center; box-shadow: 4px 4px 0px #5d4037; }
         .card img { width: 100%; aspect-ratio: 1/1; object-fit: cover; }
@@ -35,6 +37,7 @@
         .photo-item img { width: 100%; aspect-ratio: 1/1; object-fit: cover; }
         .video-label { position: absolute; top: 10px; left: 10px; right: 10px; aspect-ratio: 1/1; background: rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center; color: white; font-size: 40px; z-index: 1; }
 
+        /* 預覽與浮動按鈕 */
         #viewerOverlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); display: none; z-index: 9999; flex-direction: column; align-items: center; justify-content: center; }
         #viewerContent { width: 95%; max-width: 500px; height: 80vh; position: relative; display: flex; align-items: center; justify-content: center; }
         #closeBtn { position: absolute; top: -50px; right: 10px; color: white; font-size: 35px; cursor: pointer; font-weight: bold; }
@@ -55,7 +58,7 @@
 
     <div class="upload-card-btn" onclick="document.getElementById('videoInput').click()" style="border-color: #8d6e63;">
         <h4 style="color: #8d6e63;">🎥 投稿影片</h4>
-        <span>可多選，上限 30MB，超過請直接傳至群組</span>
+        <span>支援多選，單部上限 30MB，重複自動跳過</span>
         <input type="file" id="videoInput" class="hidden-input" accept="video/*" multiple onchange="processVideos(this)">
     </div>
 
@@ -74,13 +77,19 @@
         const gasUrl = 'https://script.google.com/macros/s/AKfycbyBsFLlYt415vWiBipXhvycp_OMoQAJZdtfBi85IvQ29sfyCQphy6P0RrhMndpoLT33/exec'; 
         const liffId = '2008678090-ZMqCkYFi'; 
         let allData = { categories: [], allFiles: [] };
+        let currentUser = "未知上傳者";
 
-        // 1. 保留並強化重複檢查
+        // 提取使用者純名稱的輔助函式
+        function getPureName() {
+            return document.getElementById('userName').innerText.replace('📽️ ', '').replace(' 的相簿', '').trim();
+        }
+
+        // 檢查重複
         function isDuplicate(fileName) {
             return allData.allFiles.some(file => file.name === fileName);
         }
 
-        // 2. 原有圖片壓縮功能 (完全保留)
+        // 圖片壓縮邏輯
         function compressImage(file) {
             return new Promise((resolve) => {
                 const reader = new FileReader();
@@ -102,7 +111,7 @@
             });
         }
 
-        // 3. 原有照片上傳流程 (完全保留)
+        // 處理照片 (含 userName 紀錄)
         async function processImages(input) {
             const files = Array.from(input.files);
             if (files.length === 0) return;
@@ -118,14 +127,21 @@
                 status.innerText = `⏳ 正在上傳照片: ${file.name}`;
                 try {
                     const data = await compressImage(file);
-                    await fetch(gasUrl, { method: "POST", body: JSON.stringify({ fileName: checkName, fileData: data })});
+                    await fetch(gasUrl, { 
+                        method: "POST", 
+                        body: JSON.stringify({ 
+                            fileName: checkName, 
+                            fileData: data,
+                            userName: getPureName() 
+                        })
+                    });
                 } catch (e) { console.error(e); }
             }
-            alert("照片上傳結束");
+            alert("照片投稿完成！");
             finishUpload(input);
         }
 
-        // 4. 強化影片處理：支援多選 + 30MB 告知 + 重複檢查 (保留原有 POST 邏輯)
+        // 處理影片 (多選 + 30MB + 重複檢查 + userName 紀錄)
         async function processVideos(input) {
             const files = Array.from(input.files);
             if (files.length === 0) return;
@@ -133,17 +149,14 @@
             disableButtons(true);
 
             for (let file of files) {
-                // 大小檢查
                 if (file.size > 30 * 1024 * 1024) {
-                    alert(`⚠️ 影片「${file.name}」太大了 (${Math.round(file.size/1024/1024)}MB)\n由於超過 30MB 限制，請直接將影片傳送到 LINE 群組中分享！`);
+                    alert(`⚠️ 影片「${file.name}」太大了 (${Math.round(file.size/1024/1024)}MB)\n由於超過 30MB 限制，請直接傳到 LINE 群組分享！`);
                     continue;
                 }
-                // 重複檢查
                 if (isDuplicate(file.name)) {
                     alert(`【跳過重複】影片「${file.name}」已在相簿中。`);
                     continue;
                 }
-
                 status.innerText = `⏳ 正在傳送影片: ${file.name}`;
                 try {
                     const base64 = await new Promise((resolve) => {
@@ -151,10 +164,17 @@
                         reader.onload = (e) => resolve(e.target.result);
                         reader.readAsDataURL(file);
                     });
-                    await fetch(gasUrl, { method: "POST", body: JSON.stringify({ fileName: file.name, fileData: base64 })});
+                    await fetch(gasUrl, { 
+                        method: "POST", 
+                        body: JSON.stringify({ 
+                            fileName: file.name, 
+                            fileData: base64,
+                            userName: getPureName()
+                        })
+                    });
                 } catch (e) { console.error(e); }
             }
-            alert("影片投稿結束");
+            alert("影片投稿處理結束");
             finishUpload(input);
         }
 
@@ -168,7 +188,7 @@
             disableButtons(false); input.value = ""; fetchData();
         }
 
-        // --- 原有顯示與 LIFF 邏輯 (完全保留，無修改) ---
+        // --- 顯示與 LIFF 邏輯 ---
         function getFileId(url) {
             let id = "";
             if (url.includes('id=')) id = url.split('id=')[1].split('&')[0];
