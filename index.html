@@ -29,8 +29,7 @@
 
         /* 網格系統 */
         .grid-container { display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; width: 100%; max-width: 400px; }
-        .card { background: #fffef0; padding: 10px; border: 1px solid #5d4037; cursor: pointer; text-align: center; box-shadow: 4px 4px 0px #5d4037; transition: 0.3s; }
-        .card:active { transform: translate(2px, 2px); box-shadow: 2px 2px 0px #5d4037; }
+        .card { background: #fffef0; padding: 10px; border: 1px solid #5d4037; cursor: pointer; text-align: center; box-shadow: 4px 4px 0px #5d4037; }
         .card img { width: 100%; aspect-ratio: 1/1; object-fit: cover; }
         
         .photo-item { background: white; padding: 10px 10px 25px 10px; border: 1px solid #ddd; position: relative; box-shadow: 3px 3px 8px rgba(0,0,0,0.1); cursor: pointer; }
@@ -39,7 +38,7 @@
         .video-label { position: absolute; top: 10px; left: 10px; right: 10px; aspect-ratio: 1/1; background: rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center; color: white; font-size: 40px; z-index: 1; }
 
         #uploadSection { background: rgba(255, 254, 240, 0.9); padding: 15px; margin-bottom: 25px; border: 2px solid #5d4037; width: 90%; max-width: 350px; text-align: center; }
-        #statusText { font-size: 12px; margin-top: 8px; color: #8d6e63; font-weight: bold; }
+        #statusInfo { font-size: 12px; margin-top: 5px; color: #8d6e63; min-height: 18px; font-weight: bold; }
     </style>
 </head>
 <body>
@@ -48,9 +47,9 @@
 
     <div id="uploadSection">
         <h4 style="margin:0;">投稿新照片</h4>
-        <input type="file" id="fileInput" accept="image/*,video/*" multiple style="margin-top:10px; width: 100%;">
-        <div id="statusText"></div>
-        <button onclick="handleUpload()" id="uploadBtn" style="width:100%; background:#5d4037; color:#e5d3b3; border:none; padding:10px; cursor:pointer; font-weight:bold; margin-top:10px;">開始上傳</button>
+        <input type="file" id="fileInput" accept="image/*,video/*" multiple style="width: 100%; margin-top: 10px;">
+        <div id="statusInfo"></div>
+        <button onclick="uploadFile()" id="uploadBtn" style="width:100%; background:#5d4037; color:#e5d3b3; border:none; padding:10px; cursor:pointer; font-weight:bold; margin-top:10px;">送出</button>
     </div>
 
     <div id="loading">正在開啟相簿...</div>
@@ -74,7 +73,7 @@
         const liffId = '2008678090-ZMqCkYFi'; 
         let allData = { categories: [], allFiles: [] };
 
-        // 圖片壓縮函式
+        // 輔助函式：壓縮圖片
         function compressImage(file) {
             return new Promise((resolve) => {
                 const reader = new FileReader();
@@ -86,28 +85,26 @@
                         const canvas = document.createElement('canvas');
                         let width = img.width;
                         let height = img.height;
-                        const max_size = 1280; // 最大寬度或高度
-
-                        if (width > height) {
-                            if (width > max_size) {
-                                height *= max_size / width;
-                                width = max_size;
-                            }
-                        } else {
-                            if (height > max_size) {
-                                width *= max_size / height;
-                                height = max_size;
-                            }
+                        const max_size = 1200; 
+                        if (width > height && width > max_size) {
+                            height *= max_size / width; width = max_size;
+                        } else if (height > max_size) {
+                            width *= max_size / height; height = max_size;
                         }
-                        canvas.width = width;
-                        canvas.height = height;
+                        canvas.width = width; canvas.height = height;
                         const ctx = canvas.getContext('2d');
                         ctx.drawImage(img, 0, 0, width, height);
-                        // 壓縮為 JPEG，品質 0.7
-                        resolve(canvas.toDataURL('image/jpeg', 0.7));
+                        resolve(canvas.toDataURL('image/jpeg', 0.7)); 
                     };
                 };
             });
+        }
+
+        function getFileId(url) {
+            let id = "";
+            if (url.includes('id=')) id = url.split('id=')[1].split('&')[0];
+            else { const match = url.match(/\/d\/(.+?)\//); if (match) id = match[1]; }
+            return id;
         }
 
         async function initLIFF() {
@@ -129,60 +126,6 @@
                 document.getElementById('loading').style.display = 'none';
                 showAlbumList();
             } catch (err) { document.getElementById('loading').innerText = "載入失敗"; }
-        }
-
-        // 處理多檔案序列上傳
-        async function handleUpload() {
-            const fileInput = document.getElementById('fileInput');
-            const files = fileInput.files;
-            if (files.length === 0) return alert("請先選取檔案");
-
-            const btn = document.getElementById('uploadBtn');
-            const status = document.getElementById('statusText');
-            btn.disabled = true;
-            btn.innerText = "傳送中...";
-
-            for (let i = 0; i < files.length; i++) {
-                const file = files[i];
-                status.innerText = `正在處理並上傳 (${i + 1}/${files.length}): ${file.name}`;
-
-                try {
-                    let fileData;
-                    // 判斷是否為圖片，若是則壓縮
-                    if (file.type.startsWith('image/')) {
-                        fileData = await compressImage(file);
-                    } else {
-                        fileData = await new Promise(r => {
-                            const reader = new FileReader();
-                            reader.onload = (e) => r(e.target.result);
-                            reader.readAsDataURL(file);
-                        });
-                    }
-
-                    await fetch(gasUrl, {
-                        method: "POST",
-                        body: JSON.stringify({ 
-                            fileName: file.type.startsWith('image/') ? file.name.split('.')[0] + ".jpg" : file.name, 
-                            fileData: fileData 
-                        })
-                    });
-                } catch (err) {
-                    console.error("上傳出錯", err);
-                }
-            }
-
-            status.innerText = "✅ 全部上傳成功！";
-            btn.innerText = "開始上傳";
-            btn.disabled = false;
-            fileInput.value = "";
-            setTimeout(() => { status.innerText = ""; fetchData(); }, 2000);
-        }
-
-        function getFileId(url) {
-            let id = "";
-            if (url.includes('id=')) id = url.split('id=')[1].split('&')[0];
-            else { const match = url.match(/\/d\/(.+?)\//); if (match) id = match[1]; }
-            return id;
         }
 
         function showAlbumList() {
@@ -215,11 +158,9 @@
                 const fid = getFileId(item.url);
                 const thumb = `https://drive.google.com/thumbnail?id=${fid}&sz=w600`;
                 const isVideo = item.type.includes('video');
-                
                 const div = document.createElement('div');
                 div.className = 'photo-item';
                 div.onclick = () => openViewer(fid, isVideo);
-                
                 let icon = isVideo ? '<div class="video-label">▶</div>' : '';
                 div.innerHTML = `${icon}<img src="${thumb}"><p style="font-size:10px;text-align:center;margin-top:5px;">${item.name}</p>`;
                 photoGrid.appendChild(div);
@@ -231,7 +172,6 @@
             const content = document.getElementById('viewerContent');
             const overlay = document.getElementById('viewerOverlay');
             content.innerHTML = '<span id="closeBtn" onclick="closeViewer()">✕</span>';
-
             if (isVideo) {
                 content.innerHTML += `
                     <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; height:100%; color:white; text-align:center;">
@@ -251,6 +191,59 @@
         function closeViewer() {
             document.getElementById('viewerOverlay').style.display = 'none';
             document.body.style.overflow = 'auto';
+        }
+
+        // 優化後的上傳功能：支援多選與壓縮
+        async function uploadFile() {
+            const fileInput = document.getElementById('fileInput');
+            const files = fileInput.files;
+            if (files.length === 0) return alert("請選檔案");
+
+            const btn = document.getElementById('uploadBtn');
+            const status = document.getElementById('statusInfo');
+            
+            // 鎖定 UI
+            btn.innerText = "傳送中..."; 
+            btn.disabled = true;
+
+            for (let i = 0; i < files.length; i++) {
+                const file = files[i];
+                // 更新目前進度提示
+                status.innerText = `正在傳送 (${i + 1}/${files.length}): ${file.name}`;
+                
+                try {
+                    let fileData;
+                    // 圖片進行 Canvas 壓縮
+                    if (file.type.startsWith('image/')) {
+                        fileData = await compressImage(file);
+                    } else {
+                        // 影片或其它檔案維持原樣讀取 Base64
+                        fileData = await new Promise(r => {
+                            const reader = new FileReader();
+                            reader.onload = (e) => r(e.target.result);
+                            reader.readAsDataURL(file);
+                        });
+                    }
+
+                    // 執行 POST 上傳到 GAS
+                    await fetch(gasUrl, { 
+                        method: "POST", 
+                        body: JSON.stringify({ 
+                            fileName: file.type.startsWith('image/') ? file.name.split('.')[0] + ".jpg" : file.name, 
+                            fileData: fileData 
+                        }) 
+                    });
+                } catch (err) { 
+                    console.error("上傳失敗:", file.name, err); 
+                }
+            }
+            
+            alert("全部檔案上傳完成！");
+            status.innerText = "";
+            btn.innerText = "送出"; 
+            btn.disabled = false;
+            fileInput.value = "";
+            fetchData(); // 重新整理網頁資料
         }
 
         initLIFF();
