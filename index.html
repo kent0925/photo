@@ -17,16 +17,16 @@
         /* 隱藏預設 input */
         .hidden-input { display: none; }
 
-        /* 按鍵式卡片 */
+        /* 整合後的按鍵式卡片 */
         .upload-card-btn {
             background: #fffef0; width: 90%; max-width: 350px;
-            padding: 20px; margin-bottom: 15px; border: 2px solid #5d4037;
+            padding: 25px 20px; margin-bottom: 15px; border: 2px solid #5d4037;
             text-align: center; cursor: pointer; box-shadow: 6px 6px 0px #5d4037;
             transition: 0.2s; display: flex; flex-direction: column; align-items: center;
         }
         .upload-card-btn:active { transform: translate(3px, 3px); box-shadow: 3px 3px 0px #5d4037; }
-        .upload-card-btn h4 { margin: 0; font-size: 18px; }
-        .upload-card-btn span { font-size: 11px; margin-top: 5px; color: #8d6e63; }
+        .upload-card-btn h4 { margin: 0; font-size: 20px; color: #5d4037; }
+        .upload-card-btn span { font-size: 11px; margin-top: 8px; color: #8d6e63; line-height: 1.4; }
 
         #globalStatus { font-size: 12px; margin-bottom: 15px; color: #b71c1c; font-weight: bold; text-align: center; min-height: 18px; }
 
@@ -51,16 +51,10 @@
     <h2 id="userName">🎞️ 載入回憶中...</h2>
     <div id="globalStatus"></div>
 
-    <div class="upload-card-btn" onclick="document.getElementById('imageInput').click()">
-        <h4>📸 投稿照片</h4>
-        <span>支援多選，重複將自動跳過並紀錄姓名</span>
-        <input type="file" id="imageInput" class="hidden-input" accept="image/*" multiple onchange="processImages(this)">
-    </div>
-
-    <div class="upload-card-btn" onclick="document.getElementById('videoInput').click()" style="border-color: #8d6e63;">
-        <h4 style="color: #8d6e63;">🎥 投稿影片</h4>
-        <span>支援多選，上限 30MB，自動置頂</span>
-        <input type="file" id="videoInput" class="hidden-input" accept="video/*" multiple onchange="processVideos(this)">
+    <div class="upload-card-btn" onclick="document.getElementById('unifiedInput').click()">
+        <h4>📸 投稿回憶</h4>
+        <span>支援多選 (照片/影片)，影片單部上限 30MB<br>自動跳過重複並置頂，紀錄上傳者姓名</span>
+        <input type="file" id="unifiedInput" class="hidden-input" accept="image/*,video/*" multiple onchange="processUnifiedFiles(this)">
     </div>
 
     <div id="loading">正在開啟相簿...</div>
@@ -111,76 +105,71 @@
             });
         }
 
-        // 處理照片 (保留原邏輯 + 加入 userName)
-        async function processImages(input) {
+        // 整合處理照片與影片
+        async function processUnifiedFiles(input) {
             const files = Array.from(input.files);
             if (files.length === 0) return;
             const status = document.getElementById('globalStatus');
             disableButtons(true);
 
             for (let file of files) {
-                const checkName = file.name.split('.')[0] + ".jpg";
-                if (isDuplicate(checkName)) {
-                    alert(`【跳過】照片「${file.name}」已存在於相簿中。`);
-                    continue;
+                const isImage = file.type.startsWith('image/');
+                const isVideo = file.type.startsWith('video/');
+                let fileNameToUpload = file.name;
+
+                // 處理照片流程
+                if (isImage) {
+                    fileNameToUpload = file.name.split('.')[0] + ".jpg";
+                    if (isDuplicate(fileNameToUpload)) {
+                        alert(`【跳過】照片「${file.name}」已存在。`);
+                        continue;
+                    }
+                    status.innerText = `⏳ 正在上傳照片: ${file.name}`;
+                    try {
+                        const data = await compressImage(file);
+                        await uploadToGas(fileNameToUpload, data);
+                    } catch (e) { console.error(e); }
+                } 
+                // 處理影片流程
+                else if (isVideo) {
+                    if (file.size > 30 * 1024 * 1024) {
+                        alert(`⚠️ 影片「${file.name}」超過 30MB 限制，請直接傳至群組。`);
+                        continue;
+                    }
+                    if (isDuplicate(fileNameToUpload)) {
+                        alert(`【跳過】影片「${file.name}」已存在。`);
+                        continue;
+                    }
+                    status.innerText = `⏳ 正在傳送影片: ${file.name}`;
+                    try {
+                        const base64 = await new Promise((resolve) => {
+                            const reader = new FileReader();
+                            reader.onload = (e) => resolve(e.target.result);
+                            reader.readAsDataURL(file);
+                        });
+                        await uploadToGas(fileNameToUpload, base64);
+                    } catch (e) { console.error(e); }
                 }
-                status.innerText = `⏳ 正在上傳照片: ${file.name}`;
-                try {
-                    const data = await compressImage(file);
-                    await fetch(gasUrl, { 
-                        method: "POST", 
-                        body: JSON.stringify({ 
-                            fileName: checkName, 
-                            fileData: data,
-                            userName: getPureUserName() // 傳送上傳者姓名
-                        })
-                    });
-                } catch (e) { console.error(e); }
             }
-            alert("照片投稿處理結束");
+            alert("投稿處理完成！");
             finishUpload(input);
         }
 
-        // 處理影片 (多選 + 30MB + 重複檢查 + userName)
-        async function processVideos(input) {
-            const files = Array.from(input.files);
-            if (files.length === 0) return;
-            const status = document.getElementById('globalStatus');
-            disableButtons(true);
-
-            for (let file of files) {
-                if (file.size > 30 * 1024 * 1024) {
-                    alert(`⚠️ 影片「${file.name}」太大 (${Math.round(file.size/1024/1024)}MB)\n由於超過 30MB，請改傳至 LINE 群組！`);
-                    continue;
-                }
-                if (isDuplicate(file.name)) {
-                    alert(`【跳過】影片「${file.name}」已存在於相簿中。`);
-                    continue;
-                }
-                status.innerText = `⏳ 正在傳送影片: ${file.name}`;
-                try {
-                    const base64 = await new Promise((resolve) => {
-                        const reader = new FileReader();
-                        reader.onload = (e) => resolve(e.target.result);
-                        reader.readAsDataURL(file);
-                    });
-                    await fetch(gasUrl, { 
-                        method: "POST", 
-                        body: JSON.stringify({ 
-                            fileName: file.name, 
-                            fileData: base64,
-                            userName: getPureUserName() // 傳送上傳者姓名
-                        })
-                    });
-                } catch (e) { console.error(e); }
-            }
-            alert("影片投稿處理結束");
-            finishUpload(input);
+        // 封裝上傳函式 (確保帶入 userName)
+        async function uploadToGas(name, data) {
+            return fetch(gasUrl, { 
+                method: "POST", 
+                body: JSON.stringify({ 
+                    fileName: name, 
+                    fileData: data,
+                    userName: getPureUserName()
+                })
+            });
         }
 
         function disableButtons(bool) {
-            const btns = document.querySelectorAll('.upload-card-btn');
-            btns.forEach(b => { b.style.opacity = bool ? "0.5" : "1"; b.style.pointerEvents = bool ? "none" : "auto"; });
+            const btn = document.querySelector('.upload-card-btn');
+            if(btn) { btn.style.opacity = bool ? "0.5" : "1"; btn.style.pointerEvents = bool ? "none" : "auto"; }
         }
 
         function finishUpload(input) {
@@ -188,7 +177,6 @@
             disableButtons(false); input.value = ""; fetchData();
         }
 
-        // 原有邏輯：解析 Google Drive ID
         function getFileId(url) {
             let id = "";
             if (url.includes('id=')) id = url.split('id=')[1].split('&')[0];
@@ -196,7 +184,6 @@
             return id;
         }
 
-        // 原有邏輯：LIFF 初始化
         async function initLIFF() {
             try {
                 await liff.init({ liffId });
@@ -209,13 +196,12 @@
             } catch (err) { fetchData(); }
         }
 
-        // 原有邏輯：抓取資料 (加入置頂排序)
         async function fetchData() {
             try {
                 const response = await fetch(gasUrl);
                 allData = await response.json();
                 
-                // 強制排序：最新的日期 (date) 排在最上面
+                // 關鍵：將最新上傳日期放在最上面
                 if (allData.allFiles) {
                     allData.allFiles.sort((a, b) => new Date(b.date) - new Date(a.date));
                 }
@@ -225,7 +211,6 @@
             } catch (err) { document.getElementById('loading').innerText = "載入失敗"; }
         }
 
-        // 原有邏輯：相簿列表
         function showAlbumList() {
             document.getElementById('floatingMenu').style.display = 'none';
             document.getElementById('photoGrid').style.display = 'none';
@@ -242,7 +227,6 @@
             });
         }
 
-        // 原有邏輯：照片網格
         function showPhotos(catName) {
             document.getElementById('albumGrid').style.display = 'none';
             document.getElementById('floatingMenu').style.display = 'flex';
@@ -261,7 +245,6 @@
             window.scrollTo(0,0);
         }
 
-        // 原有邏輯：預覽功能
         function openViewer(id, isVideo) {
             const content = document.getElementById('viewerContent');
             const overlay = document.getElementById('viewerOverlay');
