@@ -14,9 +14,10 @@
             display: flex; flex-direction: column; align-items: center;
         }
 
+        /* 隱藏預設 input */
         .hidden-input { display: none; }
 
-        /* 卡片按鍵式設計 */
+        /* 按鍵式卡片 */
         .upload-card-btn {
             background: #fffef0; width: 90%; max-width: 350px;
             padding: 20px; margin-bottom: 15px; border: 2px solid #5d4037;
@@ -37,7 +38,7 @@
         .photo-item img { width: 100%; aspect-ratio: 1/1; object-fit: cover; }
         .video-label { position: absolute; top: 10px; left: 10px; right: 10px; aspect-ratio: 1/1; background: rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center; color: white; font-size: 40px; z-index: 1; }
 
-        /* 預覽與浮動按鈕 */
+        /* 預覽與浮動選單 */
         #viewerOverlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); display: none; z-index: 9999; flex-direction: column; align-items: center; justify-content: center; }
         #viewerContent { width: 95%; max-width: 500px; height: 80vh; position: relative; display: flex; align-items: center; justify-content: center; }
         #closeBtn { position: absolute; top: -50px; right: 10px; color: white; font-size: 35px; cursor: pointer; font-weight: bold; }
@@ -52,13 +53,13 @@
 
     <div class="upload-card-btn" onclick="document.getElementById('imageInput').click()">
         <h4>📸 投稿照片</h4>
-        <span>支援多選，重複照片將自動跳過</span>
+        <span>支援多選，重複將自動跳過並紀錄姓名</span>
         <input type="file" id="imageInput" class="hidden-input" accept="image/*" multiple onchange="processImages(this)">
     </div>
 
     <div class="upload-card-btn" onclick="document.getElementById('videoInput').click()" style="border-color: #8d6e63;">
         <h4 style="color: #8d6e63;">🎥 投稿影片</h4>
-        <span>支援多選，單部上限 30MB，重複自動跳過</span>
+        <span>支援多選，上限 30MB，自動置頂</span>
         <input type="file" id="videoInput" class="hidden-input" accept="video/*" multiple onchange="processVideos(this)">
     </div>
 
@@ -77,10 +78,9 @@
         const gasUrl = 'https://script.google.com/macros/s/AKfycbyBsFLlYt415vWiBipXhvycp_OMoQAJZdtfBi85IvQ29sfyCQphy6P0RrhMndpoLT33/exec'; 
         const liffId = '2008678090-ZMqCkYFi'; 
         let allData = { categories: [], allFiles: [] };
-        let currentUser = "未知上傳者";
 
-        // 提取使用者純名稱的輔助函式
-        function getPureName() {
+        // 提取純姓名
+        function getPureUserName() {
             return document.getElementById('userName').innerText.replace('📽️ ', '').replace(' 的相簿', '').trim();
         }
 
@@ -89,7 +89,7 @@
             return allData.allFiles.some(file => file.name === fileName);
         }
 
-        // 圖片壓縮邏輯
+        // 圖片壓縮
         function compressImage(file) {
             return new Promise((resolve) => {
                 const reader = new FileReader();
@@ -111,7 +111,7 @@
             });
         }
 
-        // 處理照片 (含 userName 紀錄)
+        // 處理照片 (保留原邏輯 + 加入 userName)
         async function processImages(input) {
             const files = Array.from(input.files);
             if (files.length === 0) return;
@@ -121,7 +121,7 @@
             for (let file of files) {
                 const checkName = file.name.split('.')[0] + ".jpg";
                 if (isDuplicate(checkName)) {
-                    alert(`【跳過重複】照片「${file.name}」已在相簿中。`);
+                    alert(`【跳過】照片「${file.name}」已存在於相簿中。`);
                     continue;
                 }
                 status.innerText = `⏳ 正在上傳照片: ${file.name}`;
@@ -132,16 +132,16 @@
                         body: JSON.stringify({ 
                             fileName: checkName, 
                             fileData: data,
-                            userName: getPureName() 
+                            userName: getPureUserName() // 傳送上傳者姓名
                         })
                     });
                 } catch (e) { console.error(e); }
             }
-            alert("照片投稿完成！");
+            alert("照片投稿處理結束");
             finishUpload(input);
         }
 
-        // 處理影片 (多選 + 30MB + 重複檢查 + userName 紀錄)
+        // 處理影片 (多選 + 30MB + 重複檢查 + userName)
         async function processVideos(input) {
             const files = Array.from(input.files);
             if (files.length === 0) return;
@@ -150,11 +150,11 @@
 
             for (let file of files) {
                 if (file.size > 30 * 1024 * 1024) {
-                    alert(`⚠️ 影片「${file.name}」太大了 (${Math.round(file.size/1024/1024)}MB)\n由於超過 30MB 限制，請直接傳到 LINE 群組分享！`);
+                    alert(`⚠️ 影片「${file.name}」太大 (${Math.round(file.size/1024/1024)}MB)\n由於超過 30MB，請改傳至 LINE 群組！`);
                     continue;
                 }
                 if (isDuplicate(file.name)) {
-                    alert(`【跳過重複】影片「${file.name}」已在相簿中。`);
+                    alert(`【跳過】影片「${file.name}」已存在於相簿中。`);
                     continue;
                 }
                 status.innerText = `⏳ 正在傳送影片: ${file.name}`;
@@ -169,7 +169,7 @@
                         body: JSON.stringify({ 
                             fileName: file.name, 
                             fileData: base64,
-                            userName: getPureName()
+                            userName: getPureUserName() // 傳送上傳者姓名
                         })
                     });
                 } catch (e) { console.error(e); }
@@ -188,7 +188,7 @@
             disableButtons(false); input.value = ""; fetchData();
         }
 
-        // --- 顯示與 LIFF 邏輯 ---
+        // 原有邏輯：解析 Google Drive ID
         function getFileId(url) {
             let id = "";
             if (url.includes('id=')) id = url.split('id=')[1].split('&')[0];
@@ -196,6 +196,7 @@
             return id;
         }
 
+        // 原有邏輯：LIFF 初始化
         async function initLIFF() {
             try {
                 await liff.init({ liffId });
@@ -208,15 +209,23 @@
             } catch (err) { fetchData(); }
         }
 
+        // 原有邏輯：抓取資料 (加入置頂排序)
         async function fetchData() {
             try {
                 const response = await fetch(gasUrl);
                 allData = await response.json();
+                
+                // 強制排序：最新的日期 (date) 排在最上面
+                if (allData.allFiles) {
+                    allData.allFiles.sort((a, b) => new Date(b.date) - new Date(a.date));
+                }
+
                 document.getElementById('loading').style.display = 'none';
                 showAlbumList();
             } catch (err) { document.getElementById('loading').innerText = "載入失敗"; }
         }
 
+        // 原有邏輯：相簿列表
         function showAlbumList() {
             document.getElementById('floatingMenu').style.display = 'none';
             document.getElementById('photoGrid').style.display = 'none';
@@ -228,11 +237,12 @@
                 const coverUrl = fid ? `https://drive.google.com/thumbnail?id=${fid}&sz=w400` : "";
                 const div = document.createElement('div');
                 div.className = 'card'; div.onclick = () => showPhotos(cat.name);
-                div.innerHTML = `<img src="${coverUrl}"><div style="font-size:12px;margin-top:5px;">${cat.name}</div>`;
+                div.innerHTML = `<img src="${coverUrl}"><div style="font-size:12px;margin-top:5px;">${cat.name} (${photos.length})</div>`;
                 albumGrid.appendChild(div);
             });
         }
 
+        // 原有邏輯：照片網格
         function showPhotos(catName) {
             document.getElementById('albumGrid').style.display = 'none';
             document.getElementById('floatingMenu').style.display = 'flex';
@@ -251,6 +261,7 @@
             window.scrollTo(0,0);
         }
 
+        // 原有邏輯：預覽功能
         function openViewer(id, isVideo) {
             const content = document.getElementById('viewerContent');
             const overlay = document.getElementById('viewerOverlay');
