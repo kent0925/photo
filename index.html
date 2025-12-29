@@ -73,17 +73,14 @@
         const liffId = '2008678090-ZMqCkYFi'; 
         let allData = { categories: [], allFiles: [] };
 
-        // 提取純姓名
         function getPureUserName() {
             return document.getElementById('userName').innerText.replace('📽️ ', '').replace(' 的相簿', '').trim();
         }
 
-        // 檢查重複
         function isDuplicate(fileName) {
             return allData.allFiles.some(file => file.name === fileName);
         }
 
-        // 圖片壓縮
         function compressImage(file) {
             return new Promise((resolve) => {
                 const reader = new FileReader();
@@ -105,7 +102,6 @@
             });
         }
 
-        // 整合處理照片與影片
         async function processUnifiedFiles(input) {
             const files = Array.from(input.files);
             if (files.length === 0) return;
@@ -117,7 +113,6 @@
                 const isVideo = file.type.startsWith('video/');
                 let fileNameToUpload = file.name;
 
-                // 處理照片流程
                 if (isImage) {
                     fileNameToUpload = file.name.split('.')[0] + ".jpg";
                     if (isDuplicate(fileNameToUpload)) {
@@ -130,7 +125,6 @@
                         await uploadToGas(fileNameToUpload, data);
                     } catch (e) { console.error(e); }
                 } 
-                // 處理影片流程
                 else if (isVideo) {
                     if (file.size > 30 * 1024 * 1024) {
                         alert(`⚠️ 影片「${file.name}」超過 30MB 限制，請直接傳至群組。`);
@@ -155,7 +149,6 @@
             finishUpload(input);
         }
 
-        // 封裝上傳函式 (確保帶入 userName)
         async function uploadToGas(name, data) {
             return fetch(gasUrl, { 
                 method: "POST", 
@@ -201,7 +194,7 @@
                 const response = await fetch(gasUrl);
                 allData = await response.json();
                 
-                // 關鍵：將最新上傳日期放在最上面
+                // 1. 檔案排序：確保最新檔案排在最前
                 if (allData.allFiles) {
                     allData.allFiles.sort((a, b) => new Date(b.date) - new Date(a.date));
                 }
@@ -215,14 +208,25 @@
             document.getElementById('floatingMenu').style.display = 'none';
             document.getElementById('photoGrid').style.display = 'none';
             const albumGrid = document.getElementById('albumGrid');
-            albumGrid.style.display = 'grid'; albumGrid.innerHTML = "";
-            allData.categories.forEach(cat => {
+            albumGrid.style.display = 'grid'; 
+            albumGrid.innerHTML = "";
+
+            // 2. 資料夾排序：計算各相簿中最新檔案日期，並由新到舊排序資料夾
+            const sortedCats = allData.categories.map(cat => {
                 const photos = allData.allFiles.filter(p => String(p.category) === String(cat.name));
-                const fid = photos[0] ? getFileId(photos[0].url) : "";
+                const latestDate = photos.length > 0 ? new Date(photos[0].date).getTime() : 0;
+                return { ...cat, latestDate, photos };
+            });
+
+            sortedCats.sort((a, b) => b.latestDate - a.latestDate);
+
+            sortedCats.forEach(cat => {
+                const fid = cat.photos[0] ? getFileId(cat.photos[0].url) : "";
                 const coverUrl = fid ? `https://drive.google.com/thumbnail?id=${fid}&sz=w400` : "";
                 const div = document.createElement('div');
-                div.className = 'card'; div.onclick = () => showPhotos(cat.name);
-                div.innerHTML = `<img src="${coverUrl}"><div style="font-size:12px;margin-top:5px;">${cat.name} (${photos.length})</div>`;
+                div.className = 'card'; 
+                div.onclick = () => showPhotos(cat.name);
+                div.innerHTML = `<img src="${coverUrl}"><div style="font-size:12px;margin-top:5px;">${cat.name} (${cat.photos.length})</div>`;
                 albumGrid.appendChild(div);
             });
         }
