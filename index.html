@@ -14,6 +14,7 @@
             display: flex; flex-direction: column; align-items: center;
         }
 
+        h2 { margin-top: 10px; letter-spacing: 1px; }
         .hidden-input { display: none; }
 
         /* 投稿按鈕 */
@@ -37,13 +38,11 @@
         
         .photo-item { background: white; padding: 10px 10px 25px 10px; border: 1px solid #ddd; position: relative; box-shadow: 3px 3px 8px rgba(0,0,0,0.1); cursor: pointer; }
         .photo-item img { width: 100%; aspect-ratio: 1/1; object-fit: cover; }
-        
-        /* 影片標籤 (保留以供識別) */
         .video-label { position: absolute; top: 10px; left: 10px; right: 10px; aspect-ratio: 1/1; background: rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center; color: white; font-size: 40px; z-index: 1; }
 
-        /* 照片預覽視窗 */
+        /* 預覽視窗優化 */
         #viewerOverlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); display: none; z-index: 9999; flex-direction: column; align-items: center; justify-content: center; }
-        #viewerContent { width: 95%; max-width: 500px; height: 80vh; position: relative; display: flex; align-items: center; justify-content: center; }
+        #viewerContent { width: 95%; max-width: 500px; height: 70vh; position: relative; display: flex; align-items: center; justify-content: center; }
         #closeBtn { position: absolute; top: -50px; right: 10px; color: white; font-size: 35px; cursor: pointer; font-weight: bold; }
         
         .floating-menu { position: fixed; bottom: 25px; right: 20px; display: none; flex-direction: column; gap: 12px; z-index: 999; }
@@ -52,12 +51,14 @@
 </head>
 <body>
 
-    <h2 id="userName">🎞️ 載入回憶中...</h2>
+    <h2 id="pageTitle">🎞️ 大老二會時光相簿</h2>
+    <span id="userName" style="display:none;">訪客</span>
+    
     <div id="globalStatus"></div>
 
     <div class="upload-card-btn" onclick="document.getElementById('unifiedInput').click()">
         <h4>📸 投稿照片</h4>
-        <span>支援多選照片，自動跳過重複並置頂<br><span class="video-remind">⚠️ 影片請直接傳至群組</span></span>
+        <span>支援多張照片選擇，自動跳過重複並置頂<br><span class="video-remind">⚠️ 影片請直接傳至群組相簿</span></span>
         <input type="file" id="unifiedInput" class="hidden-input" accept="image/*" multiple onchange="processUnifiedFiles(this)">
     </div>
 
@@ -77,13 +78,8 @@
         const liffId = '2008678090-ZMqCkYFi'; 
         let allData = { categories: [], allFiles: [] };
 
-        function getPureUserName() {
-            return document.getElementById('userName').innerText.replace('📽️ ', '').replace(' 的相簿', '').trim();
-        }
-
-        function isDuplicate(fileName) {
-            return allData.allFiles.some(file => file.name === fileName);
-        }
+        function getPureUserName() { return document.getElementById('userName').innerText.trim(); }
+        function isDuplicate(fileName) { return allData.allFiles.some(file => file.name === fileName); }
 
         function compressImage(file) {
             return new Promise((resolve) => {
@@ -109,15 +105,12 @@
         async function processUnifiedFiles(input) {
             const files = Array.from(input.files);
             const photoFiles = files.filter(f => f.type.startsWith('image/'));
-            
             if (photoFiles.length === 0) {
                 if (files.length > 0) alert("此處僅限照片投稿，影片請傳至群組。");
                 return;
             }
-
             const status = document.getElementById('globalStatus');
             disableButtons(true);
-
             for (let file of photoFiles) {
                 const fileNameToUpload = file.name.split('.')[0] + ".jpg";
                 if (isDuplicate(fileNameToUpload)) continue;
@@ -134,11 +127,7 @@
         async function uploadToGas(name, data) {
             return fetch(gasUrl, { 
                 method: "POST", 
-                body: JSON.stringify({ 
-                    fileName: name, 
-                    fileData: data,
-                    userName: getPureUserName()
-                })
+                body: JSON.stringify({ fileName: name, fileData: data, userName: getPureUserName() })
             });
         }
 
@@ -165,7 +154,7 @@
                 if (!liff.isLoggedIn()) liff.login();
                 else {
                     const profile = await liff.getProfile();
-                    document.getElementById('userName').innerText = `📽️ ${profile.displayName} 的相簿`;
+                    document.getElementById('userName').innerText = profile.displayName;
                     fetchData();
                 }
             } catch (err) { fetchData(); }
@@ -189,15 +178,12 @@
             const albumGrid = document.getElementById('albumGrid');
             albumGrid.style.display = 'grid'; 
             albumGrid.innerHTML = "";
-
             const sortedCats = allData.categories.map(cat => {
                 const photos = allData.allFiles.filter(p => String(p.category) === String(cat.name));
                 const latestDate = photos.length > 0 ? new Date(photos[0].date).getTime() : 0;
                 return { ...cat, latestDate, photos };
             });
-
             sortedCats.sort((a, b) => b.latestDate - a.latestDate);
-
             sortedCats.forEach(cat => {
                 const fid = cat.photos[0] ? getFileId(cat.photos[0].url) : "";
                 const coverUrl = fid ? `https://drive.google.com/thumbnail?id=${fid}&sz=w400` : "";
@@ -214,22 +200,13 @@
             document.getElementById('floatingMenu').style.display = 'flex';
             const photoGrid = document.getElementById('photoGrid');
             photoGrid.style.display = 'grid'; photoGrid.innerHTML = "";
-            
             allData.allFiles.filter(p => String(p.category) === String(catName)).forEach(item => {
                 const fid = getFileId(item.url);
                 const thumb = `https://drive.google.com/thumbnail?id=${fid}&sz=w600`;
                 const isVideo = item.type && item.type.includes('video');
-                
                 const div = document.createElement('div');
                 div.className = 'photo-item'; 
-                
-                // 邏輯關鍵：影片直接打開視窗，照片才開 Viewer
-                if (isVideo) {
-                    div.onclick = () => window.open(`https://drive.google.com/file/d/${fid}/view`);
-                } else {
-                    div.onclick = () => openViewer(fid);
-                }
-
+                div.onclick = () => openViewer(fid, isVideo); // 統一呼叫 Viewer
                 let icon = isVideo ? '<div class="video-label">▶</div>' : '';
                 div.innerHTML = `${icon}<img src="${thumb}"><p style="font-size:10px;text-align:center;margin-top:5px;">${item.name}</p>`;
                 photoGrid.appendChild(div);
@@ -237,16 +214,26 @@
             window.scrollTo(0,0);
         }
 
-        // 僅處理照片的函數
-        function openViewer(id) {
+        // 修改後的播放/觀看邏輯
+        function openViewer(id, isVideo) {
             const content = document.getElementById('viewerContent');
             const overlay = document.getElementById('viewerOverlay');
             content.innerHTML = '<span id="closeBtn" onclick="closeViewer()">✕</span>';
-            content.innerHTML += `<img src="https://drive.google.com/thumbnail?id=${id}&sz=w1200" style="max-width:100%; max-height:100%; object-fit:contain;">`;
+            
+            if (isVideo) {
+                // 內嵌 Google Drive 播放器，達成「直接撥放」且「不跳轉」
+                content.innerHTML += `<iframe src="https://drive.google.com/file/d/${id}/preview" width="100%" height="100%" frameborder="0" allow="autoplay"></iframe>`;
+            } else {
+                content.innerHTML += `<img src="https://drive.google.com/thumbnail?id=${id}&sz=w1200" style="max-width:100%; max-height:100%; object-fit:contain;">`;
+            }
             overlay.style.display = 'flex'; document.body.style.overflow = 'hidden';
         }
 
-        function closeViewer() { document.getElementById('viewerOverlay').style.display = 'none'; document.body.style.overflow = 'auto'; }
+        function closeViewer() { 
+            document.getElementById('viewerContent').innerHTML = ""; // 關閉時清空，停止影片聲音
+            document.getElementById('viewerOverlay').style.display = 'none'; 
+            document.body.style.overflow = 'auto'; 
+        }
 
         initLIFF();
     </script>
