@@ -14,10 +14,9 @@
             display: flex; flex-direction: column; align-items: center;
         }
 
-        /* 隱藏預設 input */
         .hidden-input { display: none; }
 
-        /* 整合後的按鍵式卡片 */
+        /* 投稿按鈕 */
         .upload-card-btn {
             background: #fffef0; width: 90%; max-width: 350px;
             padding: 25px 20px; margin-bottom: 15px; border: 2px solid #5d4037;
@@ -26,22 +25,27 @@
         }
         .upload-card-btn:active { transform: translate(3px, 3px); box-shadow: 3px 3px 0px #5d4037; }
         .upload-card-btn h4 { margin: 0; font-size: 20px; color: #5d4037; }
-        .upload-card-btn span { font-size: 11px; margin-top: 8px; color: #8d6e63; line-height: 1.4; }
+        .upload-card-btn span { font-size: 11px; margin-top: 8px; color: #8d6e63; line-height: 1.5; }
+        .video-remind { color: #b71c1c; font-weight: bold; }
 
         #globalStatus { font-size: 12px; margin-bottom: 15px; color: #b71c1c; font-weight: bold; text-align: center; min-height: 18px; }
 
-        /* 相簿網格系統 */
+        /* 相簿網格 */
         .grid-container { display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; width: 100%; max-width: 400px; }
         .card { background: #fffef0; padding: 10px; border: 1px solid #5d4037; cursor: pointer; text-align: center; box-shadow: 4px 4px 0px #5d4037; }
         .card img { width: 100%; aspect-ratio: 1/1; object-fit: cover; }
+        
         .photo-item { background: white; padding: 10px 10px 25px 10px; border: 1px solid #ddd; position: relative; box-shadow: 3px 3px 8px rgba(0,0,0,0.1); cursor: pointer; }
         .photo-item img { width: 100%; aspect-ratio: 1/1; object-fit: cover; }
+        
+        /* 影片標籤 (保留以供識別) */
         .video-label { position: absolute; top: 10px; left: 10px; right: 10px; aspect-ratio: 1/1; background: rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center; color: white; font-size: 40px; z-index: 1; }
 
-        /* 預覽與浮動選單 */
+        /* 照片預覽視窗 */
         #viewerOverlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); display: none; z-index: 9999; flex-direction: column; align-items: center; justify-content: center; }
         #viewerContent { width: 95%; max-width: 500px; height: 80vh; position: relative; display: flex; align-items: center; justify-content: center; }
         #closeBtn { position: absolute; top: -50px; right: 10px; color: white; font-size: 35px; cursor: pointer; font-weight: bold; }
+        
         .floating-menu { position: fixed; bottom: 25px; right: 20px; display: none; flex-direction: column; gap: 12px; z-index: 999; }
         .fab { width: 55px; height: 55px; border-radius: 50%; background: #5d4037; color: #e5d3b3; border: 2px solid #e5d3b3; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: bold; cursor: pointer; box-shadow: 0 4px 8px rgba(0,0,0,0.3); }
     </style>
@@ -52,9 +56,9 @@
     <div id="globalStatus"></div>
 
     <div class="upload-card-btn" onclick="document.getElementById('unifiedInput').click()">
-        <h4>📸 投稿回憶</h4>
-        <span>支援多選 (照片/影片)，影片單部上限 30MB<br>自動跳過重複並置頂，紀錄上傳者姓名</span>
-        <input type="file" id="unifiedInput" class="hidden-input" accept="image/*,video/*" multiple onchange="processUnifiedFiles(this)">
+        <h4>📸 投稿照片</h4>
+        <span>支援多選照片，自動跳過重複並置頂<br><span class="video-remind">⚠️ 影片請直接傳至群組相簿</span></span>
+        <input type="file" id="unifiedInput" class="hidden-input" accept="image/*" multiple onchange="processUnifiedFiles(this)">
     </div>
 
     <div id="loading">正在開啟相簿...</div>
@@ -104,48 +108,26 @@
 
         async function processUnifiedFiles(input) {
             const files = Array.from(input.files);
-            if (files.length === 0) return;
+            const photoFiles = files.filter(f => f.type.startsWith('image/'));
+            
+            if (photoFiles.length === 0) {
+                if (files.length > 0) alert("此處僅限照片投稿，影片請傳至群組。");
+                return;
+            }
+
             const status = document.getElementById('globalStatus');
             disableButtons(true);
 
-            for (let file of files) {
-                const isImage = file.type.startsWith('image/');
-                const isVideo = file.type.startsWith('video/');
-                let fileNameToUpload = file.name;
-
-                if (isImage) {
-                    fileNameToUpload = file.name.split('.')[0] + ".jpg";
-                    if (isDuplicate(fileNameToUpload)) {
-                        alert(`【跳過】照片「${file.name}」已存在。`);
-                        continue;
-                    }
-                    status.innerText = `⏳ 正在上傳照片: ${file.name}`;
-                    try {
-                        const data = await compressImage(file);
-                        await uploadToGas(fileNameToUpload, data);
-                    } catch (e) { console.error(e); }
-                } 
-                else if (isVideo) {
-                    if (file.size > 30 * 1024 * 1024) {
-                        alert(`⚠️ 影片「${file.name}」超過 30MB 限制，請直接傳至群組。`);
-                        continue;
-                    }
-                    if (isDuplicate(fileNameToUpload)) {
-                        alert(`【跳過】影片「${file.name}」已存在。`);
-                        continue;
-                    }
-                    status.innerText = `⏳ 正在傳送影片: ${file.name}`;
-                    try {
-                        const base64 = await new Promise((resolve) => {
-                            const reader = new FileReader();
-                            reader.onload = (e) => resolve(e.target.result);
-                            reader.readAsDataURL(file);
-                        });
-                        await uploadToGas(fileNameToUpload, base64);
-                    } catch (e) { console.error(e); }
-                }
+            for (let file of photoFiles) {
+                const fileNameToUpload = file.name.split('.')[0] + ".jpg";
+                if (isDuplicate(fileNameToUpload)) continue;
+                status.innerText = `⏳ 正在上傳照片: ${file.name}`;
+                try {
+                    const data = await compressImage(file);
+                    await uploadToGas(fileNameToUpload, data);
+                } catch (e) { console.error(e); }
             }
-            alert("投稿處理完成！");
+            alert("投稿完成！");
             finishUpload(input);
         }
 
@@ -193,12 +175,9 @@
             try {
                 const response = await fetch(gasUrl);
                 allData = await response.json();
-                
-                // 1. 檔案排序：確保最新檔案排在最前
                 if (allData.allFiles) {
                     allData.allFiles.sort((a, b) => new Date(b.date) - new Date(a.date));
                 }
-
                 document.getElementById('loading').style.display = 'none';
                 showAlbumList();
             } catch (err) { document.getElementById('loading').innerText = "載入失敗"; }
@@ -211,7 +190,6 @@
             albumGrid.style.display = 'grid'; 
             albumGrid.innerHTML = "";
 
-            // 2. 資料夾排序：計算各相簿中最新檔案日期，並由新到舊排序資料夾
             const sortedCats = allData.categories.map(cat => {
                 const photos = allData.allFiles.filter(p => String(p.category) === String(cat.name));
                 const latestDate = photos.length > 0 ? new Date(photos[0].date).getTime() : 0;
@@ -236,12 +214,22 @@
             document.getElementById('floatingMenu').style.display = 'flex';
             const photoGrid = document.getElementById('photoGrid');
             photoGrid.style.display = 'grid'; photoGrid.innerHTML = "";
+            
             allData.allFiles.filter(p => String(p.category) === String(catName)).forEach(item => {
                 const fid = getFileId(item.url);
                 const thumb = `https://drive.google.com/thumbnail?id=${fid}&sz=w600`;
-                const isVideo = item.type.includes('video');
+                const isVideo = item.type && item.type.includes('video');
+                
                 const div = document.createElement('div');
-                div.className = 'photo-item'; div.onclick = () => openViewer(fid, isVideo);
+                div.className = 'photo-item'; 
+                
+                // 邏輯關鍵：影片直接打開視窗，照片才開 Viewer
+                if (isVideo) {
+                    div.onclick = () => window.open(`https://drive.google.com/file/d/${fid}/view`);
+                } else {
+                    div.onclick = () => openViewer(fid);
+                }
+
                 let icon = isVideo ? '<div class="video-label">▶</div>' : '';
                 div.innerHTML = `${icon}<img src="${thumb}"><p style="font-size:10px;text-align:center;margin-top:5px;">${item.name}</p>`;
                 photoGrid.appendChild(div);
@@ -249,15 +237,12 @@
             window.scrollTo(0,0);
         }
 
-        function openViewer(id, isVideo) {
+        // 僅處理照片的函數
+        function openViewer(id) {
             const content = document.getElementById('viewerContent');
             const overlay = document.getElementById('viewerOverlay');
             content.innerHTML = '<span id="closeBtn" onclick="closeViewer()">✕</span>';
-            if (isVideo) {
-                content.innerHTML += `<div style="text-align:center;"><img src="https://drive.google.com/thumbnail?id=${id}&sz=w600" style="width:80%; border-radius:10px;"><br><button onclick="window.open('https://drive.google.com/file/d/${id}/view')" style="margin-top:20px; background:#5d4037; color:#e5d3b3; border:none; padding:15px 30px; border-radius:30px; font-weight:bold; cursor:pointer;">播放影片 ▶</button></div>`;
-            } else {
-                content.innerHTML += `<img src="https://drive.google.com/thumbnail?id=${id}&sz=w1200" style="max-width:100%; max-height:100%; object-fit:contain;">`;
-            }
+            content.innerHTML += `<img src="https://drive.google.com/thumbnail?id=${id}&sz=w1200" style="max-width:100%; max-height:100%; object-fit:contain;">`;
             overlay.style.display = 'flex'; document.body.style.overflow = 'hidden';
         }
 
