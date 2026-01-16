@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>大老二會時光相簿</title>
     <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/heic2any@0.0.4/dist/heic2any.min.js"></script>
     <style>
         body { 
             background-color: #e5d3b3; 
@@ -29,21 +30,22 @@
         .upload-card-btn span { font-size: 11px; margin-top: 8px; color: #8d6e63; line-height: 1.5; }
         .video-remind { color: #b71c1c; font-weight: bold; }
 
-        #globalStatus { font-size: 12px; margin-bottom: 15px; color: #b71c1c; font-weight: bold; text-align: center; min-height: 18px; line-height: 1.4; }
+        #globalStatus { font-size: 12px; margin-bottom: 15px; color: #b71c1c; font-weight: bold; text-align: center; min-height: 18px; line-height: 1.4; white-space: pre-wrap; }
 
         /* 相簿網格 */
         .grid-container { display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; width: 100%; max-width: 400px; }
-        .card { background: #fffef0; padding: 10px; border: 1px solid #5d4037; cursor: pointer; text-align: center; box-shadow: 4px 4px 0px #5d4037; }
+        .card { background: #fffef0; padding: 10px; border: 1px solid #5d4037; cursor: pointer; text-align: center; box-shadow: 4px 4px 0px #5d4037; transition: 0.1s; }
+        .card:active { transform: scale(0.98); }
         .card img { width: 100%; aspect-ratio: 1/1; object-fit: cover; background: #eee; }
         
         .photo-item { background: white; padding: 10px 10px 25px 10px; border: 1px solid #ddd; position: relative; box-shadow: 3px 3px 8px rgba(0,0,0,0.1); cursor: pointer; }
         .photo-item img { width: 100%; aspect-ratio: 1/1; object-fit: cover; background: #fafafa; }
-        .video-label { position: absolute; top: 10px; left: 10px; right: 10px; aspect-ratio: 1/1; background: rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center; color: white; font-size: 40px; z-index: 1; }
+        .video-label { position: absolute; top: 10px; left: 10px; right: 10px; aspect-ratio: 1/1; background: rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center; color: white; font-size: 40px; z-index: 1; pointer-events: none; }
 
-        /* 預覽視窗優化 */
+        /* 預覽視窗 */
         #viewerOverlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); display: none; z-index: 9999; flex-direction: column; align-items: center; justify-content: center; }
         #viewerContent { width: 95%; max-width: 500px; height: 70vh; position: relative; display: flex; align-items: center; justify-content: center; }
-        #closeBtn { position: absolute; top: -50px; right: 10px; color: white; font-size: 35px; cursor: pointer; font-weight: bold; }
+        #closeBtn { position: absolute; top: -50px; right: 10px; color: white; font-size: 35px; cursor: pointer; font-weight: bold; padding: 10px; }
         
         .floating-menu { position: fixed; bottom: 25px; right: 20px; display: none; flex-direction: column; gap: 12px; z-index: 999; }
         .fab { width: 55px; height: 55px; border-radius: 50%; background: #5d4037; color: #e5d3b3; border: 2px solid #e5d3b3; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: bold; cursor: pointer; box-shadow: 0 4px 8px rgba(0,0,0,0.3); }
@@ -58,11 +60,11 @@
 
     <div class="upload-card-btn" onclick="document.getElementById('unifiedInput').click()">
         <h4>📸 投稿照片</h4>
-        <span>支援多張照片選擇，自動跳過重複並置頂<br><span class="video-remind">⚠️ 影片請直接傳至群組相簿</span></span>
-        <input type="file" id="unifiedInput" class="hidden-input" accept="image/*,image/heic,image/heif" multiple onchange="processUnifiedFiles(this)">
+        <span>支援多張照片選擇<br>系統自動處理 iPhone 格式<br><span class="video-remind">⚠️ 影片請直接傳至群組相簿</span></span>
+        <input type="file" id="unifiedInput" class="hidden-input" accept="image/*,.heic" multiple onchange="processUnifiedFiles(this)">
     </div>
 
-    <div id="loading">正在開啟相簿...</div>
+    <div id="loading">🚀 正在連接時光機...</div>
     <div id="albumGrid" class="grid-container"></div>
     <div id="photoGrid" class="grid-container" style="display:none;"></div>
 
@@ -74,6 +76,7 @@
     </div>
 
     <script>
+        // ★★★ 請替換成你的新 GAS 網址 ★★★
         const gasUrl = 'https://script.google.com/macros/s/AKfycbyBsFLlYt415vWiBipXhvycp_OMoQAJZdtfBi85IvQ29sfyCQphy6P0RrhMndpoLT33/exec'; 
         const liffId = '2008678090-ZMqCkYFi'; 
         let allData = { categories: [], allFiles: [] };
@@ -81,8 +84,21 @@
         function getPureUserName() { return document.getElementById('userName').innerText.trim(); }
         function isDuplicate(fileName) { return allData.allFiles.some(file => file.name === fileName); }
 
-        function compressImage(file) {
-            return new Promise((resolve) => {
+        // 優化版壓縮圖片函式 (支援 HEIC)
+        async function compressImage(file) {
+            // 如果是 HEIC 格式，先轉檔
+            if (file.name.toLowerCase().endsWith('.heic') || file.type === 'image/heic') {
+                try {
+                    document.getElementById('globalStatus').innerText += `\n正在轉換 HEIC 格式...`;
+                    const blob = await heic2any({ blob: file, toType: "image/jpeg", quality: 0.8 });
+                    file = blob; // 將轉好的 blob 視為新檔案
+                } catch (e) {
+                    console.error("HEIC 轉換失敗", e);
+                    throw new Error("HEIC 轉換失敗");
+                }
+            }
+
+            return new Promise((resolve, reject) => {
                 const reader = new FileReader();
                 reader.readAsDataURL(file);
                 reader.onload = (e) => {
@@ -91,7 +107,7 @@
                     img.onload = () => {
                         const canvas = document.createElement('canvas');
                         let w = img.width, h = img.height;
-                        const maxSide = 1200;
+                        const maxSide = 1200; // 保持 1200px 限制
                         if (w > h && w > maxSide) { h *= maxSide / w; w = maxSide; }
                         else if (h > maxSide) { w *= maxSide / h; h = maxSide; }
                         canvas.width = w; canvas.height = h;
@@ -99,18 +115,15 @@
                         ctx.drawImage(img, 0, 0, w, h);
                         resolve(canvas.toDataURL('image/jpeg', 0.8)); 
                     };
+                    img.onerror = (err) => reject(err);
                 };
+                reader.onerror = (err) => reject(err);
             });
         }
 
         async function processUnifiedFiles(input) {
             const files = Array.from(input.files);
-            const photoFiles = files.filter(f => f.type.startsWith('image/') || f.name.toLowerCase().endsWith('.heic'));
-            
-            if (photoFiles.length === 0) {
-                if (files.length > 0) alert("此處僅限照片投稿，影片請傳至群組。");
-                return;
-            }
+            if (files.length === 0) return;
 
             const status = document.getElementById('globalStatus');
             disableButtons(true);
@@ -118,23 +131,27 @@
             let successCount = 0;
             let skipCount = 0;
 
-            for (let i = 0; i < photoFiles.length; i++) {
-                const file = photoFiles[i];
-                const fileNameToUpload = file.name.split('.')[0] + ".jpg";
+            for (let i = 0; i < files.length; i++) {
+                let file = files[i];
+                // 統一檔名為 jpg (即使原本是 heic)
+                let baseName = file.name.split('.')[0];
+                const fileNameToUpload = baseName + ".jpg";
                 
                 if (isDuplicate(fileNameToUpload)) {
                     skipCount++;
                     continue;
                 }
 
-                status.innerText = `⏳ 正在上傳 (${i + 1}/${photoFiles.length})\n${file.name}`;
+                status.innerText = `⏳ 正在處理 (${i + 1}/${files.length})\n${file.name}`;
                 
                 try {
                     const data = await compressImage(file);
+                    status.innerText = `⬆️ 正在上傳 (${i + 1}/${files.length})\n${file.name}`;
                     const res = await uploadToGas(fileNameToUpload, data);
                     if (res.ok) successCount++;
                 } catch (e) { 
                     console.error("上傳出錯:", e); 
+                    status.innerText += `\n❌ ${file.name} 失敗`;
                 }
             }
 
@@ -164,15 +181,7 @@
             document.getElementById('globalStatus').innerText = "";
             disableButtons(false); 
             input.value = ""; 
-            fetchData();
-        }
-
-        function getFileId(url) {
-            let id = "";
-            if (!url) return "";
-            if (url.includes('id=')) id = url.split('id=')[1].split('&')[0];
-            else { const match = url.match(/\/d\/(.+?)\//); if (match) id = match[1]; }
-            return id;
+            // 上傳後不強制重整，因為後端尚未分類
         }
 
         async function initLIFF() {
@@ -186,23 +195,26 @@
                     fetchData();
                 }
             } catch (err) { 
-                console.log("LIFF 初始化失敗或不在 LINE 環境中");
-                fetchData(); 
+                console.log("LIFF Error");
+                fetchData(); // 即使 LIFF 失敗也嘗試載入
             }
         }
 
         async function fetchData() {
             try {
+                // 第一次讀取不強制刷新
                 const response = await fetch(gasUrl);
                 allData = await response.json();
-                if (allData.allFiles) {
-                    allData.allFiles.sort((a, b) => new Date(b.date) - new Date(a.date));
-                }
                 document.getElementById('loading').style.display = 'none';
                 showAlbumList();
             } catch (err) { 
-                document.getElementById('loading').innerText = "載入失敗，請檢查網路連接。"; 
+                document.getElementById('loading').innerText = "載入失敗，請檢查網路。"; 
             }
+        }
+
+        // 輔助函式：產生 Google Drive 縮圖網址
+        function getThumb(id, size = 'w400') {
+            return `https://drive.google.com/thumbnail?id=${id}&sz=${size}`;
         }
 
         function showAlbumList() {
@@ -212,21 +224,27 @@
             albumGrid.style.display = 'grid'; 
             albumGrid.innerHTML = "";
             
+            // 整理分類資料
             const sortedCats = allData.categories.map(cat => {
                 const photos = allData.allFiles.filter(p => String(p.category) === String(cat.name));
-                const latestDate = photos.length > 0 ? new Date(photos[0].date).getTime() : 0;
+                // 因為後端已經轉成 timestamp，這裡直接比較數字
+                const latestDate = photos.length > 0 ? photos[0].date : 0;
                 return { ...cat, latestDate, photos };
             });
 
             sortedCats.sort((a, b) => b.latestDate - a.latestDate);
 
             sortedCats.forEach(cat => {
-                const fid = cat.photos[0] ? getFileId(cat.photos[0].url) : "";
-                const coverUrl = fid ? `https://drive.google.com/thumbnail?id=${fid}&sz=w400` : "";
+                // 如果該分類沒照片，顯示預設圖或不顯示
+                if (cat.photos.length === 0) return;
+
+                const coverId = cat.photos[0].id;
+                const coverUrl = getThumb(coverId, 'w400');
+                
                 const div = document.createElement('div');
                 div.className = 'card'; 
                 div.onclick = () => showPhotos(cat.name);
-                div.innerHTML = `<img src="${coverUrl}" loading="lazy">
+                div.innerHTML = `<img src="${coverUrl}" loading="lazy"><br>
                                 <div style="font-size:12px;margin-top:5px;font-weight:bold;">${cat.name}</div>
                                 <div style="font-size:10px;color:#8d6e63;">(${cat.photos.length} 項目)</div>`;
                 albumGrid.appendChild(div);
@@ -243,15 +261,13 @@
             const filteredFiles = allData.allFiles.filter(p => String(p.category) === String(catName));
             
             filteredFiles.forEach(item => {
-                const fid = getFileId(item.url);
-                const thumb = `https://drive.google.com/thumbnail?id=${fid}&sz=w600`;
+                const thumb = getThumb(item.id, 'w600');
                 const isVideo = item.type && item.type.includes('video');
                 const div = document.createElement('div');
                 div.className = 'photo-item'; 
-                div.onclick = () => openViewer(fid, isVideo);
+                div.onclick = () => openViewer(item.id, isVideo);
                 
                 let icon = isVideo ? '<div class="video-label">▶</div>' : '';
-                // 加入 loading="lazy" 優化滑動效能
                 div.innerHTML = `${icon}<img src="${thumb}" loading="lazy"><p style="font-size:10px;text-align:center;margin-top:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${item.name}</p>`;
                 photoGrid.appendChild(div);
             });
@@ -261,14 +277,14 @@
         function openViewer(id, isVideo) {
             const content = document.getElementById('viewerContent');
             const overlay = document.getElementById('viewerOverlay');
-            // 清除舊內容並重新加入關閉按鈕
             content.innerHTML = '<span id="closeBtn" onclick="closeViewer()">✕</span>';
             
             if (isVideo) {
-                // 使用 Google Drive 預覽播放器
                 content.innerHTML += `<iframe src="https://drive.google.com/file/d/${id}/preview" width="100%" height="100%" frameborder="0" allow="autoplay" style="background:#000;"></iframe>`;
             } else {
-                content.innerHTML += `<img src="https://drive.google.com/thumbnail?id=${id}&sz=w1200" style="max-width:100%; max-height:100%; object-fit:contain; box-shadow: 0 0 20px rgba(0,0,0,0.5);">`;
+                // 檢視大圖使用 w1200
+                const bigImg = getThumb(id, 'w1200');
+                content.innerHTML += `<img src="${bigImg}" style="max-width:100%; max-height:100%; object-fit:contain; box-shadow: 0 0 20px rgba(0,0,0,0.5);">`;
             }
             overlay.style.display = 'flex'; 
             document.body.style.overflow = 'hidden';
@@ -280,7 +296,6 @@
             document.body.style.overflow = 'auto'; 
         }
 
-        // 啟動
         initLIFF();
     </script>
 </body>
