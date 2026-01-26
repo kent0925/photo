@@ -486,8 +486,9 @@
                         </div>
                     </div>
 
-                    <!-- Home Delivery Address -->
+                    <!-- Home Delivery Address (Shared for Pickup) -->
                     <div id="ship-home-info" class="space-y-2 hidden">
+                        <p id="addr-section-title" class="text-xs font-bold text-stone-500">收件地址</p>
                         <div class="flex gap-2">
                             <input type="text" id="ship-zip" placeholder="郵遞區號" oninput="handleZipInput(this.value)"
                                 class="w-24 bg-stone-50 rounded-xl px-3 py-2 text-base font-bold outline-none">
@@ -568,27 +569,43 @@
         let CVS_STORES = [];
 
         window.onload = async () => {
-            await initLIFF();
-            initBankSelect();
-            initAddressData(); // Load Address JSON
-            loadCVSCities(); // Init CVS
-            await loadStores(); // Fetch Store List
+            // Parallel Init
+            const p1 = initLIFF();
+            const p2 = initAddressData();
+            const p3 = loadCVSCities(); // Sync/Async check
+            const p4 = loadStores();    // Main Data
+            const p5 = initBankSelect();
+
             loadCartLocal();
+            await Promise.all([p1, p4]); // Wait for critical
+
             renderHome();
             document.getElementById('loading-screen').classList.add('opacity-0', 'pointer-events-none');
-            // Init Default Ship View - Moved to openCart or goToStore
         };
 
         // --- ADDRESS LOGIC ---
         async function initAddressData() {
+            // Cache Check
+            const cached = localStorage.getItem('TW_ADDRESS_DATA');
+            if (cached) {
+                TW_ADDRESS_DATA = JSON.parse(cached);
+                populateCity();
+            }
+
             try {
                 const res = await fetch('https://raw.githubusercontent.com/donma/TaiwanAddressCityAreaRoadChineseEnglishJSON/master/AllData.json');
-                TW_ADDRESS_DATA = await res.json();
-
-                // Populate City Select
-                const citySel = document.getElementById('ship-city');
-                citySel.innerHTML = '<option value="">縣市</option>' + TW_ADDRESS_DATA.map(c => `<option value="${c.CityName}">${c.CityName}</option>`).join('');
+                const json = await res.json();
+                TW_ADDRESS_DATA = json;
+                localStorage.setItem('TW_ADDRESS_DATA', JSON.stringify(json));
+                populateCity();
             } catch (e) { console.error('Address Load Failed', e); }
+        }
+
+        function populateCity() {
+            const citySel = document.getElementById('ship-city');
+            // Keep "Select City"
+            if (citySel.options.length > 1) return; // Already populated
+            citySel.innerHTML = '<option value="">縣市</option>' + TW_ADDRESS_DATA.map(c => `<option value="${c.CityName}">${c.CityName}</option>`).join('');
         }
 
         function handleCityChange() {
@@ -732,20 +749,29 @@
 
         async function initBankSelect() {
             const sel = document.getElementById('set-bank-code');
-            sel.innerHTML = '<option>載入銀行列表中...</option>';
+
+            // Cache Check
+            const cached = localStorage.getItem('BANK_LIST');
+            if (cached) {
+                renderBankOpts(JSON.parse(cached));
+            } else {
+                sel.innerHTML = '<option>載入銀行列表中...</option>';
+            }
+
             try {
-                // Fetch Taiwan Bank List (Open Data / GitHub)
                 const res = await fetch('https://raw.githubusercontent.com/nczz/taiwan-banks-list/main/banks_sort_by_codes.json');
                 const data = await res.json();
-
-                // Render Options: [Code] Name
-                // Some banks share codes (e.g. Farmers Assn), so we list them all.
-                sel.innerHTML = '<option value="">選擇銀行</option>' +
-                    data.map(b => `<option value="${b.bank_code} ${b.name}">[${b.bank_code}] ${b.name}</option>`).join('');
+                localStorage.setItem('BANK_LIST', JSON.stringify(data));
+                renderBankOpts(data);
             } catch (e) {
-                console.error(e);
-                sel.innerHTML = '<option value="">銀行列表載入失敗</option>';
+                if (!cached) sel.innerHTML = '<option value="">銀行列表載入失敗</option>';
             }
+        }
+
+        function renderBankOpts(data) {
+            const sel = document.getElementById('set-bank-code');
+            sel.innerHTML = '<option value="">選擇銀行</option>' +
+                data.map(b => `<option value="${b.bank_code} ${b.name}">[${b.bank_code}] ${b.name}</option>`).join('');
         }
 
         async function initLIFF() {
@@ -771,11 +797,36 @@
         }
 
         async function loadStores() {
+            // Cache Strategy: Show cached first, then update
+            const cacheKey = `STORES_${app.eventId}`;
+            const cached = localStorage.getItem(cacheKey);
+            const now = Date.now();
+
+            if (cached) {
+                try {
+                    const c = JSON.parse(cached);
+                    // Valid for 5 min?
+                    if (now - c.ts < 300000) {
+                        app.stores = c.data;
+                        renderHome();
+                        return; // Skip fetch if fresh
+                    } else {
+                        app.stores = c.data;
+                        renderHome(); // Show stale first
+                    }
+                } catch (e) { }
+            }
+
             try {
                 const res = await fetch(`${GAS_URL}?action=getStores&eventId=${app.eventId}`);
                 const json = await res.json();
                 app.stores = json.stores || [];
-            } catch (e) { alert('載入失敗'); }
+                // Save Cache
+                localStorage.setItem(cacheKey, JSON.stringify({ ts: now, data: app.stores }));
+                renderHome(); // Update with fresh data
+            } catch (e) {
+                if (!app.stores.length) alert('載入失敗'); // Only alert if no cache
+            }
         }
 
         // --- NAVIGATION ---
@@ -1194,11 +1245,12 @@
             const pickupInfo = document.getElementById('ship-pickup-info');
             const cvsInfo = document.getElementById('ship-cvs-info');
             const homeInfo = document.getElementById('ship-home-info');
+            const addrTitle = document.getElementById('addr-section-title');
 
             if (m === 'pickup') {
                 pickupInfo.classList.remove('hidden');
                 cvsInfo.classList.add('hidden');
-                homeInfo.classList.remove('hidden'); // Enable Address for Pickup
+                homeInfo.classList.add('hidden'); // Hide Address for Pickup (User Request)
 
                 // Show Pickup Details
                 const info = app.currentStore.info;
@@ -1219,7 +1271,6 @@
                         <p class="font-bold text-stone-700">📍 攤位位置：${loc}</p>
                         ${tel ? `<p class="font-bold text-stone-700">📞 聯絡電話：${tel}</p>` : ''}
                     </div>
-                    <p class="text-xs font-bold text-stone-500 mt-2 mb-1">請填寫詳細地址/位置</p>
                 `;
 
             } else if (m === 'cvs') {
@@ -1230,6 +1281,7 @@
                 pickupInfo.classList.add('hidden');
                 cvsInfo.classList.add('hidden');
                 homeInfo.classList.remove('hidden');
+                addrTitle.innerText = "收件地址";
             }
 
             calcTotal();
@@ -1264,14 +1316,14 @@
                 const time = document.getElementById('pickup-time').value;
                 if (!time) return alert('請選擇預約自取時間');
 
-                // Address Validation for Pickup (Same as Home)
-                const city = document.getElementById('ship-city').value;
-                const dist = document.getElementById('ship-dist').value;
-                const road = document.getElementById('ship-road').value;
-                const detail = document.getElementById('ship-addr-detail').value;
-                if (!city || !dist || !detail) return alert('請填寫完整地址/位置');
+                // Get Store Loc
+                let loc = '攤位現場';
+                try {
+                    const bank = JSON.parse(app.currentStore.info.BankInfo || '{}');
+                    if (bank.pickupLoc) loc = bank.pickupLoc;
+                } catch (e) { }
 
-                addr = `[自取預約: ${time.replace('T', ' ')}] ${document.getElementById('ship-zip').value} ${city}${dist}${road}${detail}`;
+                addr = `[自取預約: ${time.replace('T', ' ')}] 地點: ${loc}`;
 
             }
             else if (app.shippingMethod === 'cvs') {
