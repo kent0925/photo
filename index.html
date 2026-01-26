@@ -133,8 +133,21 @@
             </div>
         </main>
 
+        <div id="product-grid" class="grid grid-cols-2 gap-4">
+            <!-- Products rendered here -->
+        </div>
+        </main>
+
+        <!-- VIEW: My Orders (Buyer) -->
+        <main id="view-orders" class="hidden pt-24 pb-32 px-4 max-w-md mx-auto animate-fade-in space-y-6">
+            <h2 class="text-2xl font-black text-stone-800">我的訂單</h2>
+            <div id="my-order-list" class="space-y-3">
+                <p class="text-center text-stone-400 text-xs py-4">載入中...</p>
+            </div>
+        </main>
+
         <!-- VIEW: Seller Dashboard -->
-        <main id="view-seller" class="hidden animate-fade-in space-y-8 pb-24">
+        <main id="view-seller" class="hidden pt-24 pb-32 px-4 max-w-md mx-auto animate-fade-in space-y-6">
             <div class="flex justify-between items-end">
                 <div class="space-y-1">
                     <h2 class="text-2xl font-black text-stone-800">攤主中心</h2>
@@ -239,11 +252,6 @@
                     <button onclick="saveStoreSettings()" id="btn-save-store"
                         class="w-full bg-stone-800 text-white font-bold py-3 rounded-xl text-sm btn-press">儲存攤位設定</button>
 
-                    <!-- Delete Store Button -->
-                    <button onclick="deleteStore()"
-                        class="w-full mt-4 bg-red-50 text-red-500 font-bold py-3 rounded-xl text-xs active:scale-95 transition-transform border border-red-100">
-                        🗑️ 刪除我的攤位 (Delete Store)
-                    </button>
             </section>
 
             <!-- 2. Create Product Module -->
@@ -306,6 +314,15 @@
                 <div id="seller-order-list" class="space-y-3 max-h-80 overflow-y-auto pr-1">
                     <p class="text-center text-stone-400 text-xs py-4">尚無訂單資料 (請點擊重新整理)</p>
                 </div>
+            </section>
+
+            <!-- 5. Danger Zone -->
+            <section class="opacity-80 hover:opacity-100 transition-opacity pb-4">
+                <button onclick="deleteStore()"
+                    class="w-full bg-red-50 text-red-500 font-bold py-3 rounded-xl text-xs active:scale-95 transition-transform border border-red-100 flex items-center justify-center gap-2">
+                    <span>🗑️</span> 刪除我的攤位 (Delete Store)
+                </button>
+                <p class="text-[10px] text-center text-stone-400 mt-2">此動作無法復原</p>
             </section>
         </main>
 
@@ -795,7 +812,7 @@
 
         function updateViewUI() {
             // Hide all views
-            ['view-home', 'view-store', 'view-seller'].forEach(id => document.getElementById(id).classList.add('hidden'));
+            ['view-home', 'view-store', 'view-seller', 'view-orders'].forEach(id => document.getElementById(id).classList.add('hidden'));
             document.getElementById('cart-float-btn').classList.add('opacity-0', 'translate-y-20');
             document.getElementById('back-btn').classList.add('hidden');
 
@@ -1743,6 +1760,121 @@
             const c = localStorage.getItem('cart');
             if (c) app.cart = JSON.parse(c);
             app.cartStoreId = localStorage.getItem('cartStoreId');
+        }
+
+        // --- ORDER MANAGEMENT (NEW) ---
+        async function fetchSellerOrders() {
+            const list = document.getElementById('seller-order-list');
+            list.innerHTML = '<p class="text-center text-stone-400 text-xs py-4">載入中...</p>';
+            try {
+                // Add timestamp
+                const res = await fetch(`${GAS_URL}?action=getOrders&storeId=${app.user.id}&_t=${Date.now()}`);
+                const json = await res.json();
+                app.sellerOrders = json.orders || [];
+                renderSellerOrders();
+            } catch (e) {
+                list.innerHTML = '<p class="text-center text-stone-400 text-xs py-4">載入失敗</p>';
+            }
+        }
+
+        function renderSellerOrders() {
+            const list = document.getElementById('seller-order-list');
+            // Filter: Hide COMPLETED by default? Or show all?
+            // User req: "Select complete then not show". So filter out COMPLETED.
+            const activeOrders = app.sellerOrders.filter(o => o.status !== 'COMPLETED' && o.status !== 'CANCELLED');
+
+            if (activeOrders.length === 0) {
+                list.innerHTML = '<p class="text-center text-stone-400 text-xs py-4">目前沒有待處理訂單</p>';
+                return;
+            }
+
+            list.innerHTML = activeOrders.map((o, i) => {
+                // Find full object index for reference if needed, but here we can just pass ID
+                return `
+                <div class="bg-stone-50 p-3 rounded-xl border border-stone-100 cursor-pointer active:scale-95 transition-transform" onclick="openOrderModal('${o.id}')">
+                    <div class="flex justify-between items-start mb-2">
+                        <div>
+                            <span class="text-[10px] font-bold text-stone-400">#${o.id.split('-')[1]}</span>
+                            <span class="text-xs font-bold text-stone-800 ml-1">${o.recipientName}</span>
+                        </div>
+                        <span class="text-xs font-bold text-orange-600">$${o.total}</span>
+                    </div>
+                    <div class="flex justify-between items-end">
+                        <span class="text-[10px] bg-white border border-stone-200 px-1.5 py-0.5 rounded text-stone-500">${o.status}</span>
+                        <div class="flex gap-2">
+                            <button onclick="event.stopPropagation(); updateOrderStatus('${o.id}', 'COMPLETED')" 
+                                class="bg-green-100 text-green-700 px-2 py-1 rounded-lg text-xs font-bold shadow-sm border border-green-200 hover:bg-green-200">完成</button>
+                        </div>
+                    </div>
+                </div>
+            `}).join('');
+        }
+
+        async function goToMyOrders() {
+            if (!app.user) return alert('請先登入');
+            app.view = 'orders';
+            updateViewUI();
+            document.getElementById('back-btn').classList.remove('hidden'); // Allow back to home
+
+            const list = document.getElementById('my-order-list');
+            list.innerHTML = '<p class="text-center text-stone-400 text-xs py-4">載入中...</p>';
+
+            try {
+                const res = await fetch(`${GAS_URL}?action=getOrders&memberId=${app.user.id}&_t=${Date.now()}`);
+                const json = await res.json();
+                const orders = json.orders || [];
+
+                if (orders.length === 0) {
+                    list.innerHTML = '<p class="text-center text-stone-400 text-xs py-4">您沒有訂單記錄</p>';
+                    return;
+                }
+
+                list.innerHTML = orders.map(o => `
+                    <div class="bg-white p-4 rounded-2xl border border-stone-100 shadow-sm relative overflow-hidden">
+                        ${o.status === 'CANCELLED' ? '<div class="absolute inset-0 bg-stone-100/50 pointer-events-none"></div>' : ''}
+                        <div class="flex justify-between mb-2">
+                             <span class="font-bold text-stone-800">訂單 #${o.id.slice(-4)}</span>
+                             <span class="font-bold ${o.status === 'COMPLETED' ? 'text-green-600' : (o.status === 'CANCELLED' ? 'text-red-500' : 'text-orange-500')} text-xs px-2 py-0.5 bg-stone-50 rounded">${o.status}</span>
+                        </div>
+                        <div class="text-xs text-stone-500 space-y-1 mb-3">
+                            <p>時間: ${o.time}</p>
+                            <p>總計: <span class="font-bold text-stone-800">$${o.total}</span></p>
+                            <p>商品: ${o.items ? o.items.map(i => i.name).join(', ') : '詳情請見明細'}</p>
+                        </div>
+                        ${(o.status === '待付款' || o.status === '待處理') ?
+                        `<button onclick="updateOrderStatus('${o.id}', 'CANCELLED')" class="w-full py-2 rounded-xl border border-red-100 text-red-500 font-bold text-xs hover:bg-red-50">取消訂單</button>`
+                        : ''}
+                    </div>
+                `).join('');
+
+            } catch (e) {
+                console.error(e);
+                list.innerHTML = '載入失敗';
+            }
+        }
+
+        async function updateOrderStatus(oid, status) {
+            const confirmMsg = status === 'CANCELLED' ? '確定要取消此訂單嗎？' : '確定要完成此訂單嗎？（將從列表中隱藏）';
+            if (!confirm(confirmMsg)) return;
+
+            try {
+                // Show loading?
+                const payload = {
+                    action: 'updateOrderStatus',
+                    eventId: app.eventId,
+                    data: { orderId: oid, status: status }
+                };
+                const res = await fetch(`${GAS_URL}?eventId=${app.eventId}`, { method: 'POST', body: JSON.stringify(payload) });
+                const json = await res.json();
+                if (json.result === 'success') {
+                    alert('操作成功');
+                    // Refresh current view
+                    if (app.view === 'seller') fetchSellerOrders();
+                    if (app.view === 'orders') goToMyOrders();
+                } else {
+                    alert('失敗: ' + json.message);
+                }
+            } catch (e) { alert('連線錯誤'); }
         }
 
     </script>
