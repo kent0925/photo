@@ -238,6 +238,12 @@
 
                     <button onclick="saveStoreSettings()" id="btn-save-store"
                         class="w-full bg-stone-800 text-white font-bold py-3 rounded-xl text-sm btn-press">儲存攤位設定</button>
+
+                    <!-- Delete Store Button -->
+                    <button onclick="deleteStore()"
+                        class="w-full mt-4 bg-red-50 text-red-500 font-bold py-3 rounded-xl text-xs active:scale-95 transition-transform border border-red-100">
+                        🗑️ 刪除我的攤位 (Delete Store)
+                    </button>
             </section>
 
             <!-- 2. Create Product Module -->
@@ -1175,7 +1181,7 @@
             if (m === 'pickup') {
                 pickupInfo.classList.remove('hidden');
                 cvsInfo.classList.add('hidden');
-                homeInfo.classList.add('hidden');
+                homeInfo.classList.remove('hidden'); // Enable Address for Pickup
 
                 // Show Pickup Details
                 const info = app.currentStore.info;
@@ -1187,19 +1193,16 @@
                     if (bank.pickupTel) tel = bank.pickupTel;
                 } catch (e) { }
 
-                // Update text
-                // Check if container exists, if not create/update?
-                // Currently pickupInfo only has time input. We should prepend/append info.
-
                 // Reset content
                 pickupInfo.innerHTML = `
-                    <p class="text-xs font-bold text-stone-500 mb-2">請選擇取貨時間</p>
+                    <p class="text-xs font-bold text-stone-500 mb-2">請選擇取貨時間與地點</p>
                     <input type="datetime-local" id="pickup-time" 
                         class="w-full bg-stone-50 rounded-xl px-3 py-2 text-base font-bold outline-none mb-2">
                     <div class="bg-orange-50 p-3 rounded-xl border border-orange-100 text-xs space-y-1">
-                        <p class="font-bold text-stone-700">📍 取貨地點：${loc}</p>
-                        ${tel ? `<p class="font-bold text-stone-700">📞 攤主電話：${tel}</p>` : ''}
+                        <p class="font-bold text-stone-700">📍 攤位位置：${loc}</p>
+                        ${tel ? `<p class="font-bold text-stone-700">📞 聯絡電話：${tel}</p>` : ''}
                     </div>
+                    <p class="text-xs font-bold text-stone-500 mt-2 mb-1">請填寫詳細地址/位置</p>
                 `;
 
             } else if (m === 'cvs') {
@@ -1243,7 +1246,16 @@
             if (app.shippingMethod === 'pickup') {
                 const time = document.getElementById('pickup-time').value;
                 if (!time) return alert('請選擇預約自取時間');
-                addr = `[自取預約] ${time.replace('T', ' ')}`;
+
+                // Address Validation for Pickup (Same as Home)
+                const city = document.getElementById('ship-city').value;
+                const dist = document.getElementById('ship-dist').value;
+                const road = document.getElementById('ship-road').value;
+                const detail = document.getElementById('ship-addr-detail').value;
+                if (!city || !dist || !detail) return alert('請填寫完整地址/位置');
+
+                addr = `[自取預約: ${time.replace('T', ' ')}] ${document.getElementById('ship-zip').value} ${city}${dist}${road}${detail}`;
+
             }
             else if (app.shippingMethod === 'cvs') {
                 addr = document.getElementById('ship-store-name').value;
@@ -1396,6 +1408,38 @@
             }
 
             btn.innerHTML = originalText; btn.disabled = false;
+        }
+
+        async function deleteStore() {
+            if (!confirm('⚠️ 警告：您確定要刪除您的攤位嗎？\n\n這將會：\n1. 您的攤位將從列表中消失\n2. 您無法再管理此攤位\n\n此動作無法復原！')) return;
+
+            // Second confirmation
+            const verify = prompt('請輸入「DELETE」以確認刪除：');
+            if (verify !== 'DELETE') return alert('取消刪除');
+
+            try {
+                const payload = {
+                    action: 'deleteStore',
+                    eventId: app.eventId,
+                    data: {
+                        eventId: app.eventId,
+                        storeId: app.user.id
+                    }
+                };
+
+                const res = await fetch(`${GAS_URL}?eventId=${app.eventId}`, { method: 'POST', body: JSON.stringify(payload) });
+                const json = await res.json();
+
+                if (json.result === 'success') {
+                    alert('攤位已刪除，將返回首頁');
+                    goHome();
+                    await loadStores(); // Refresh list to remove self
+                } else {
+                    alert('刪除失敗: ' + json.message);
+                }
+            } catch (e) {
+                alert('連線失敗');
+            }
         }
 
         // Create Product
