@@ -729,14 +729,22 @@
             try {
                 await liff.init({ liffId: LIFF_ID });
                 if (liff.isLoggedIn()) {
-                    const p = await liff.getProfile();
-                    app.user = { id: p.userId, name: p.displayName, img: p.pictureUrl };
-                    document.getElementById('user-avatar').src = p.pictureUrl;
-                    document.getElementById('user-avatar').classList.remove('hidden');
+                    try {
+                        const p = await liff.getProfile();
+                        app.user = { id: p.userId, name: p.displayName, img: p.pictureUrl };
+                        document.getElementById('user-avatar').src = p.pictureUrl;
+                        document.getElementById('user-avatar').classList.remove('hidden');
+                    } catch (err) {
+                        alert('取得資料失敗: ' + err);
+                    }
                 } else {
+                    // alert('尚未登入，將跳轉至 LINE 登入頁面'); 
                     liff.login();
                 }
-            } catch (e) { console.error('LIFF Error', e); }
+            } catch (e) {
+                console.error('LIFF Error', e);
+                alert('LINE 登入初始化失敗: ' + e + '\n請確認 LIFF ID 是否正確');
+            }
         }
 
         async function loadStores() {
