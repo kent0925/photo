@@ -1,302 +1,1699 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
+
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>大老二會時光相簿</title>
-    <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/heic2any@0.0.4/dist/heic2any.min.js"></script>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Garden Party</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700;900&display=swap" rel="stylesheet">
     <style>
-        body { 
-            background-color: #e5d3b3; 
-            background-image: url('https://www.transparenttextures.com/patterns/paper-fibers.png');
-            font-family: "Courier New", Courier, "Microsoft JhengHei", monospace;
-            color: #5d4037; margin: 0; padding: 20px;
-            display: flex; flex-direction: column; align-items: center;
+        body {
+            font-family: 'Noto Sans TC', sans-serif;
+            -webkit-tap-highlight-color: transparent;
+            background-color: #fefce8;
+            /* Light Yellow bg for festive feel */
         }
 
-        h2 { margin-top: 10px; letter-spacing: 1px; }
-        .hidden-input { display: none; }
-
-        /* 投稿按鈕 */
-        .upload-card-btn {
-            background: #fffef0; width: 90%; max-width: 350px;
-            padding: 25px 20px; margin-bottom: 15px; border: 2px solid #5d4037;
-            text-align: center; cursor: pointer; box-shadow: 6px 6px 0px #5d4037;
-            transition: 0.2s; display: flex; flex-direction: column; align-items: center;
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
         }
-        .upload-card-btn:active { transform: translate(3px, 3px); box-shadow: 3px 3px 0px #5d4037; }
-        .upload-card-btn h4 { margin: 0; font-size: 20px; color: #5d4037; }
-        .upload-card-btn span { font-size: 11px; margin-top: 8px; color: #8d6e63; line-height: 1.5; }
-        .video-remind { color: #b71c1c; font-weight: bold; }
 
-        #globalStatus { font-size: 12px; margin-bottom: 15px; color: #b71c1c; font-weight: bold; text-align: center; min-height: 18px; line-height: 1.4; white-space: pre-wrap; }
+        .no-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
 
-        /* 相簿網格 */
-        .grid-container { display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; width: 100%; max-width: 400px; }
-        .card { background: #fffef0; padding: 10px; border: 1px solid #5d4037; cursor: pointer; text-align: center; box-shadow: 4px 4px 0px #5d4037; transition: 0.1s; }
-        .card:active { transform: scale(0.98); }
-        .card img { width: 100%; aspect-ratio: 1/1; object-fit: cover; background: #eee; }
-        
-        .photo-item { background: white; padding: 10px 10px 25px 10px; border: 1px solid #ddd; position: relative; box-shadow: 3px 3px 8px rgba(0,0,0,0.1); cursor: pointer; }
-        .photo-item img { width: 100%; aspect-ratio: 1/1; object-fit: cover; background: #fafafa; }
-        .video-label { position: absolute; top: 10px; left: 10px; right: 10px; aspect-ratio: 1/1; background: rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center; color: white; font-size: 40px; z-index: 1; pointer-events: none; }
+        .glass {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+        }
 
-        /* 預覽視窗 */
-        #viewerOverlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); display: none; z-index: 9999; flex-direction: column; align-items: center; justify-content: center; }
-        #viewerContent { width: 95%; max-width: 500px; height: 70vh; position: relative; display: flex; align-items: center; justify-content: center; }
-        #closeBtn { position: absolute; top: -50px; right: 10px; color: white; font-size: 35px; cursor: pointer; font-weight: bold; padding: 10px; }
-        
-        .floating-menu { position: fixed; bottom: 25px; right: 20px; display: none; flex-direction: column; gap: 12px; z-index: 999; }
-        .fab { width: 55px; height: 55px; border-radius: 50%; background: #5d4037; color: #e5d3b3; border: 2px solid #e5d3b3; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: bold; cursor: pointer; box-shadow: 0 4px 8px rgba(0,0,0,0.3); }
-    </style>
-</head>
-<body>
+        .btn-press:active {
+            transform: scale(0.96);
+        }
 
-    <h2 id="pageTitle">🎞️ 大老二會時光相簿</h2>
-    <span id="userName" style="display:none;">訪客</span>
-    
-    <div id="globalStatus"></div>
+        .animate-fade-in {
+            animation: fadeIn 0.3s ease-out;
+        }
 
-    <div class="upload-card-btn" onclick="document.getElementById('unifiedInput').click()">
-        <h4>📸 投稿照片</h4>
-        <span>支援多張照片選擇<br>系統自動處理 iPhone 格式<br><span class="video-remind">⚠️ 影片請直接傳至群組相簿</span></span>
-        <input type="file" id="unifiedInput" class="hidden-input" accept="image/*,.heic" multiple onchange="processUnifiedFiles(this)">
-    </div>
-
-    <div id="loading">🚀 正在連接時光機...</div>
-    <div id="albumGrid" class="grid-container"></div>
-    <div id="photoGrid" class="grid-container" style="display:none;"></div>
-
-    <div id="viewerOverlay"><div id="viewerContent"><span id="closeBtn" onclick="closeViewer()">✕</span></div></div>
-
-    <div id="floatingMenu" class="floating-menu">
-        <div class="fab" onclick="window.scrollTo({top:0, behavior:'smooth'})">TOP</div>
-        <div class="fab" onclick="showAlbumList()">返回<br>列表</div>
-    </div>
-
-    <script>
-        // ★★★ 請替換成你的新 GAS 網址 ★★★
-        const gasUrl = 'https://script.google.com/macros/s/AKfycbyBsFLlYt415vWiBipXhvycp_OMoQAJZdtfBi85IvQ29sfyCQphy6P0RrhMndpoLT33/exec'; 
-        const liffId = '2008678090-ZMqCkYFi'; 
-        let allData = { categories: [], allFiles: [] };
-
-        function getPureUserName() { return document.getElementById('userName').innerText.trim(); }
-        function isDuplicate(fileName) { return allData.allFiles.some(file => file.name === fileName); }
-
-        // 優化版壓縮圖片函式 (支援 HEIC)
-        async function compressImage(file) {
-            // 如果是 HEIC 格式，先轉檔
-            if (file.name.toLowerCase().endsWith('.heic') || file.type === 'image/heic') {
-                try {
-                    document.getElementById('globalStatus').innerText += `\n正在轉換 HEIC 格式...`;
-                    const blob = await heic2any({ blob: file, toType: "image/jpeg", quality: 0.8 });
-                    file = blob; // 將轉好的 blob 視為新檔案
-                } catch (e) {
-                    console.error("HEIC 轉換失敗", e);
-                    throw new Error("HEIC 轉換失敗");
-                }
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
             }
 
-            return new Promise((resolve, reject) => {
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+    </style>
+</head>
+
+<body class="bg-stone-50 text-stone-800 pb-20 selection:bg-orange-100">
+
+    <!-- Loading Screen -->
+    <div id="loading-screen"
+        class="fixed inset-0 bg-white z-50 flex flex-col items-center justify-center transition-opacity duration-500">
+        <div class="animate-spin rounded-full h-12 w-12 border-4 border-stone-200 border-t-orange-500 mb-4"></div>
+        <p class="text-stone-400 font-bold tracking-widest text-xs">LOADING</p>
+    </div>
+
+    <!-- Header (Sticky) -->
+    <header
+        class="fixed top-0 left-0 right-0 z-40 glass border-b border-stone-100 shadow-sm transition-all duration-300"
+        id="header">
+        <div class="max-w-md mx-auto px-4 h-16 flex items-center justify-between">
+            <div class="flex items-center gap-2">
+                <!-- Back Button (Hidden on Home) -->
+                <button id="back-btn" onclick="goHome()"
+                    class="hidden p-2 -ml-2 rounded-full hover:bg-stone-100 transition-colors">
+                    <svg class="w-5 h-5 text-stone-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+                    </svg>
+                </button>
+                <!-- Title / Store Name -->
+                <h1 id="page-title" class="font-black text-xl text-stone-800 tracking-tight flex items-center gap-2">
+                    <span class="text-2xl">🎪</span> 園遊會主會場
+                </h1>
+            </div>
+
+            <div class="flex items-center gap-2">
+                <!-- Mode Toggle (Seller) -->
+                <button onclick="toggleSellerMode()" id="seller-btn"
+                    class="bg-orange-600 text-white text-xs font-bold px-3 py-1.5 rounded-full shadow-sm active:scale-95 flex items-center gap-1">
+                    <span>我要擺攤</span>
+                </button>
+                <!-- User Avatar -->
+                <img id="user-avatar" src=""
+                    class="w-8 h-8 rounded-full bg-stone-200 object-cover border border-stone-100 hidden">
+            </div>
+        </div>
+    </header>
+
+    <!-- MAIN CONTAINER -->
+    <div class="max-w-md mx-auto pt-20 px-4 min-h-screen relative">
+
+        <!-- VIEW: Platform Home (Store List) -->
+        <main id="view-home" class="animate-fade-in space-y-6">
+            <div class="space-y-1 px-1">
+                <h2 class="text-2xl font-black text-stone-800">熱鬧攤位</h2>
+                <p class="text-xs text-stone-500 font-bold">來看看大家都在賣什麼！</p>
+            </div>
+            <!-- Store Grid -->
+            <div id="store-list" class="grid grid-cols-1 gap-4 pb-10">
+                <!-- Skeloton -->
+                <div class="bg-white rounded-2xl p-4 shadow-sm h-32 animate-pulse bg-orange-100"></div>
+            </div>
+        </main>
+
+        <!-- VIEW: Store Page (Products) -->
+        <main id="view-store" class="hidden animate-fade-in space-y-6 pb-24">
+            <!-- Store Cover Info -->
+            <div id="store-header"
+                class="bg-white rounded-3xl p-6 shadow-sm border border-stone-100 text-center space-y-2 relative overflow-hidden">
+                <div class="absolute inset-0 bg-gradient-to-br from-orange-50 to-white -z-10"></div>
+                <img id="store-cover-img" src=""
+                    class="w-20 h-20 rounded-full mx-auto object-cover bg-stone-200 shadow-md mb-2">
+                <h2 id="store-page-name" class="text-2xl font-black text-stone-800">Store Name</h2>
+                <p id="store-page-desc" class="text-sm text-stone-500 font-bold">Store Description</p>
+                <div class="flex justify-center gap-4 text-xs font-bold text-stone-400 pt-2">
+                    <span id="store-ship-home">🚚 宅配 $100</span>
+                    <span id="store-ship-store">🏪 超商 $60</span>
+                </div>
+            </div>
+
+            <!-- Product Grid -->
+            <div id="product-grid" class="grid grid-cols-2 gap-4">
+                <!-- Products rendered here -->
+            </div>
+        </main>
+
+        <!-- VIEW: Seller Dashboard -->
+        <main id="view-seller" class="hidden animate-fade-in space-y-8 pb-24">
+            <div class="flex justify-between items-end">
+                <div class="space-y-1">
+                    <h2 class="text-2xl font-black text-stone-800">攤主中心</h2>
+                    <p class="text-xs text-stone-500 font-bold">佈置您的攤位與上架商品</p>
+                </div>
+                <button onclick="goToStore(app.user.id)"
+                    class="bg-orange-100 text-orange-600 px-3 py-1.5 rounded-lg text-xs font-bold active:scale-95 transition-transform">
+                    預覽攤位 ➜
+                </button>
+            </div>
+
+            <!-- 1. Store Settings Module -->
+            <section class="bg-white p-5 rounded-3xl shadow-sm border border-stone-100 space-y-4">
+                <h3 class="font-bold text-lg flex items-center gap-2">� 攤位佈置</h3>
+
+                <div class="grid grid-cols-[auto_1fr] gap-4 items-center">
+                    <div class="relative w-16 h-16 rounded-full bg-stone-100 overflow-hidden group cursor-pointer border-2 border-dashed border-stone-300 hover:border-orange-500 transition-colors"
+                        onclick="document.getElementById('store-img-input').click()">
+                        <img id="preview-store-img" class="w-full h-full object-cover hidden">
+                        <div
+                            class="absolute inset-0 flex items-center justify-center text-stone-400 group-hover:text-orange-500">
+                            📷</div>
+                    </div>
+                    <input type="file" id="store-img-input" accept="image/*" class="hidden"
+                        onchange="handleStoreImage(this)">
+                    <div class="space-y-2">
+                        <input type="text" id="set-store-name" placeholder="攤位名稱 (如: 601班 乾冰汽水)"
+                            class="w-full bg-stone-50 rounded-xl px-3 py-2 text-sm font-bold outline-none border border-transparent focus:border-stone-300">
+                        <input type="text" id="set-store-desc" placeholder="攤位介紹 (一句話)"
+                            class="w-full bg-stone-50 rounded-xl px-3 py-2 text-xs font-bold outline-none border border-transparent focus:border-stone-300">
+                    </div>
+                </div>
+
+                <div class="space-y-2 pt-2 border-t border-stone-100">
+                    <label class="text-xs font-bold text-stone-400">匯款資訊</label>
+                    <div class="grid grid-cols-2 gap-2">
+                        <select id="set-bank-code"
+                            class="col-span-2 bg-stone-50 rounded-xl px-3 py-2 text-xs font-bold outline-none border border-transparent focus:border-stone-300">
+                            <option value="">選擇銀行</option>
+                        </select>
+                        <input type="tel" id="set-bank-acc" placeholder="銀行帳號 (僅限數字)"
+                            oninput="this.value = this.value.replace(/[^0-9]/g, '')"
+                            class="w-full bg-stone-50 rounded-xl px-3 py-2 text-xs font-bold outline-none border border-transparent focus:border-stone-300">
+                        <input type="text" id="set-bank-name" placeholder="戶名"
+                            class="w-full bg-stone-50 rounded-xl px-3 py-2 text-xs font-bold outline-none border border-transparent focus:border-stone-300">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div class="grid grid-cols-2 gap-3">
+                        <!-- Home Delivery -->
+                        <div
+                            class="bg-stone-50 p-3 rounded-xl border border-transparent has-[:checked]:border-orange-500 has-[:checked]:bg-orange-50 transition-colors">
+                            <label class="flex items-center gap-2 mb-2 cursor-pointer">
+                                <input type="checkbox" id="enable-ship-home" onchange="toggleShipInput('home')"
+                                    class="w-4 h-4 accent-orange-600">
+                                <span class="text-xs font-bold text-stone-600">開啟宅配</span>
+                            </label>
+                            <div class="flex items-center gap-1">
+                                <span class="text-xs font-bold text-stone-400">$</span>
+                                <input type="number" id="set-ship-home" value="100" min="0" placeholder="運費"
+                                    oninput="if(this.value<0)this.value=0"
+                                    class="w-full bg-transparent text-sm font-bold outline-none border-b border-stone-300 focus:border-orange-500">
+                            </div>
+                        </div>
+                        <!-- CVS Delivery -->
+                        <div
+                            class="bg-stone-50 p-3 rounded-xl border border-transparent has-[:checked]:border-orange-500 has-[:checked]:bg-orange-50 transition-colors">
+                            <label class="flex items-center gap-2 mb-2 cursor-pointer">
+                                <input type="checkbox" id="enable-ship-store" onchange="toggleShipInput('store')"
+                                    class="w-4 h-4 accent-orange-600">
+                                <span class="text-xs font-bold text-stone-600">開啟超商</span>
+                            </label>
+                            <div class="flex items-center gap-1">
+                                <span class="text-xs font-bold text-stone-400">$</span>
+                                <input type="number" id="set-ship-store" value="60" min="0" placeholder="運費"
+                                    oninput="if(this.value<0)this.value=0"
+                                    class="w-full bg-transparent text-sm font-bold outline-none border-b border-stone-300 focus:border-orange-500">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-3 mt-3">
+                        <!-- Pickup Toggle -->
+                        <div
+                            class="col-span-2 bg-stone-50 p-3 rounded-xl border border-transparent has-[:checked]:border-orange-500 has-[:checked]:bg-orange-50 transition-colors">
+                            <label class="flex items-center gap-2 mb-2 cursor-pointer">
+                                <input type="checkbox" id="enable-ship-pickup" onchange="togglePickupInput()"
+                                    class="w-4 h-4 accent-orange-600">
+                                <span class="text-xs font-bold text-stone-600">開啟攤位自取</span>
+                            </label>
+                            <div class="grid grid-cols-1 gap-3">
+                                <input type="text" id="set-pickup-loc" placeholder="自取地點 (例: 攤位A01)" disabled
+                                    class="w-full bg-transparent text-sm font-bold outline-none border-b border-stone-300 focus:border-orange-500 py-1">
+                                <input type="text" id="set-pickup-tel" placeholder="自取聯絡電話" inputmode="numeric" disabled
+                                    oninput="this.value = this.value.replace(/[^0-9]/g, '')"
+                                    class="w-full bg-transparent text-sm font-bold outline-none border-b border-stone-300 focus:border-orange-500 py-1">
+                            </div>
+                        </div>
+                    </div>
+
+                    <button onclick="saveStoreSettings()" id="btn-save-store"
+                        class="w-full bg-stone-800 text-white font-bold py-3 rounded-xl text-sm btn-press">儲存攤位設定</button>
+            </section>
+
+            <!-- 2. Create Product Module -->
+            <section class="bg-white p-5 rounded-3xl shadow-sm border border-stone-100 space-y-4">
+                <h3 class="font-bold text-lg flex items-center gap-2">📦 上架新商品</h3>
+                <form id="sell-form" class="space-y-4" onsubmit="event.preventDefault(); submitProduct();">
+                    <!-- Image Upload -->
+                    <div class="relative w-full aspect-video bg-stone-50 rounded-xl border-2 border-dashed border-stone-200 flex flex-col items-center justify-center cursor-pointer hover:border-orange-400 transition-colors overflow-hidden group"
+                        onclick="document.getElementById('prod-img-input').click()">
+                        <img id="preview-prod-img" class="absolute inset-0 w-full h-full object-cover hidden">
+                        <div class="text-center group-hover:scale-110 transition-transform">
+                            <span class="text-2xl">📸</span>
+                            <p class="text-[10px] font-bold text-stone-400 mt-1">上傳商品照</p>
+                        </div>
+                    </div>
+                    <input type="file" id="prod-img-input" accept="image/*" class="hidden"
+                        onchange="handleProdImage(this)">
+
+                    <div class="grid grid-cols-2 gap-3">
+                        <input type="text" id="prod-name" required placeholder="商品名稱"
+                            class="col-span-2 w-full bg-stone-50 rounded-xl px-4 py-3 text-sm font-bold outline-none">
+                        <input type="number" id="prod-price" required min="0" placeholder="價格 (0=免費)"
+                            class="w-full bg-stone-50 rounded-xl px-4 py-3 text-sm font-bold outline-none">
+                        <input type="text" id="prod-cat" required placeholder="分類" list="cat-list"
+                            class="w-full bg-stone-50 rounded-xl px-4 py-3 text-sm font-bold outline-none">
+                    </div>
+
+                    <!-- Specs -->
+                    <div class="bg-stone-50 p-3 rounded-xl space-y-2">
+                        <div class="flex justify-between items-center"><span class="text-xs font-bold text-stone-400">規格
+                                (選填)</span> <button type="button" onclick="addSpecLine()"
+                                class="text-orange-500 text-xs font-bold">+增加</button></div>
+                        <div id="specs-container" class="space-y-2">
+                            <div class="flex gap-2"><input class="spec-key w-1/3 p-2 rounded text-xs" placeholder="顏色"
+                                    value="樣式"><input class="spec-vals flex-1 p-2 rounded text-xs" placeholder="紅,藍">
+                            </div>
+                        </div>
+                    </div>
+
+                    <button type="submit" id="submit-prod-btn"
+                        class="w-full bg-orange-500 text-white font-bold py-3 rounded-xl shadow-lg shadow-orange-200 btn-press">確認上架</button>
+                </form>
+            </section>
+
+            <!-- 3. Manage Products Module -->
+            <section class="bg-white p-5 rounded-3xl shadow-sm border border-stone-100 space-y-4">
+                <h3 class="font-bold text-lg flex items-center gap-2">📋 已上架商品</h3>
+                <div id="seller-product-list" class="space-y-3">
+                    <p class="text-center text-stone-400 text-xs py-4">載入中...</p>
+                </div>
+            </section>
+
+            <!-- 4. Order Management (NEW) -->
+            <section class="bg-white p-5 rounded-3xl shadow-sm border border-stone-100 space-y-4">
+                <div class="flex justify-between items-center">
+                    <h3 class="font-bold text-lg flex items-center gap-2">🧾 訂單管理</h3>
+                    <button onclick="fetchSellerOrders()"
+                        class="bg-stone-800 text-white px-3 py-1.5 rounded-lg text-xs font-bold">重新整理</button>
+                </div>
+                <div id="seller-order-list" class="space-y-3 max-h-80 overflow-y-auto pr-1">
+                    <p class="text-center text-stone-400 text-xs py-4">尚無訂單資料 (請點擊重新整理)</p>
+                </div>
+            </section>
+        </main>
+
+        <!-- Order Detail & Print Modal -->
+        <div id="order-modal" class="fixed inset-0 z-50 hidden">
+            <div class="absolute inset-0 bg-black/60 backdrop-blur-sm" onclick="closeOrderModal()"></div>
+            <div
+                class="absolute inset-x-4 top-10 bottom-10 bg-white rounded-2xl flex flex-col overflow-hidden shadow-2xl">
+                <!-- Header -->
+                <div class="p-4 border-b border-stone-100 flex justify-between items-center bg-stone-50">
+                    <h3 class="font-black text-lg text-stone-800">訂單內容</h3>
+                    <button onclick="closeOrderModal()"
+                        class="w-8 h-8 rounded-full bg-white text-stone-500 font-bold shadow-sm">✕</button>
+                </div>
+
+                <!-- Content (Scrollable) -->
+                <div id="order-modal-content" class="flex-1 overflow-y-auto p-4 bg-stone-50">
+                    <!-- Receipt Preview Area (Target for html2canvas) -->
+                    <div id="receipt-node"
+                        class="bg-white p-6 rounded-none shadow-none mx-auto max-w-sm text-stone-900 leading-relaxed border border-stone-200">
+                        <!-- Dynamic Content Inserted Here -->
+                    </div>
+                </div>
+
+                <!-- Footer -->
+                <div class="p-4 border-t border-stone-100 bg-white flex gap-3">
+                    <button onclick="printOrderImage()"
+                        class="flex-1 bg-orange-600 text-white font-bold py-3 rounded-xl shadow-lg active:scale-95 transition-transform">
+                        📸 產生出貨單圖片
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Generated Image Modal -->
+        <div id="img-modal" class="fixed inset-0 z-[60] hidden flex flex-col items-center justify-center p-6">
+            <div class="absolute inset-0 bg-black/90"
+                onclick="document.getElementById('img-modal').classList.add('hidden')"></div>
+            <div class="relative z-10 w-full max-w-sm bg-stone-800 p-2 rounded-2xl shadow-2xl space-y-4">
+                <p class="text-center text-white text-xs font-bold pt-2">請長按圖片儲存，或截圖分享</p>
+                <img id="generated-receipt-img" class="w-full rounded-xl bg-white">
+                <button onclick="document.getElementById('img-modal').classList.add('hidden')"
+                    class="w-full py-3 bg-white text-stone-900 font-bold rounded-xl">關閉</button>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Floating Cart Button (Visible in Store View) -->
+    <div id="cart-float-btn"
+        class="fixed bottom-6 left-0 right-0 z-30 pointer-events-none opacity-0 translate-y-20 transition-all duration-300">
+        <div class="max-w-md mx-auto px-6 flex justify-center">
+            <button onclick="openCart()"
+                class="pointer-events-auto bg-stone-900 text-white rounded-full px-6 py-3 shadow-2xl flex items-center gap-3 active:scale-95 transition-transform">
+                <div class="relative">
+                    <span class="text-xl">🛒</span>
+                    <span id="cart-count"
+                        class="absolute -top-2 -right-2 bg-red-500 text-white text-[10px] font-bold w-5 h-5 flex items-center justify-center rounded-full border-2 border-stone-900">0</span>
+                </div>
+                <span class="font-bold pr-1">結帳去</span>
+                <span id="cart-total-float" class="font-mono text-orange-300 pl-2 border-l border-stone-700">$0</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- MODALS (Product, Cart) - Reuse logical structure -->
+    <!-- (Simplified for brevity, ensuring critical logic is present) -->
+
+    <!-- Product Detail Modal -->
+    <div id="product-modal" class="fixed inset-0 z-50 hidden">
+        <div class="absolute inset-0 bg-black/40 backdrop-blur-sm" onclick="closeProductModal()"></div>
+        <div
+            class="absolute bottom-0 left-0 right-0 bg-white rounded-t-3xl p-6 transition-transform duration-300 translate-y-full transform max-h-[85vh] overflow-y-auto">
+            <div class="w-12 h-1.5 bg-stone-200 rounded-full mx-auto mb-6"></div>
+            <img id="modal-img" class="w-[150px] h-[150px] mx-auto object-cover rounded-2xl mb-4 bg-stone-100">
+            <div class="space-y-4">
+                <div>
+                    <h3 id="modal-name" class="text-2xl font-black text-stone-800">Product</h3>
+                    <p id="modal-price" class="text-xl font-bold text-orange-600">$0</p>
+                </div>
+                <!-- Specs -->
+                <div id="modal-specs" class="space-y-3"></div>
+                <!-- Qty -->
+                <div class="flex items-center justify-between bg-stone-50 p-3 rounded-xl">
+                    <span class="text-sm font-bold text-stone-500">數量</span>
+                    <div class="flex items-center gap-4">
+                        <button onclick="updateModalQty(-1)"
+                            class="w-8 h-8 rounded-full bg-white shadow flex items-center justify-center font-bold text-lg">-</button>
+                        <span id="modal-qty" class="font-bold text-xl px-2">1</span>
+                        <button onclick="updateModalQty(1)"
+                            class="w-8 h-8 rounded-full bg-white shadow flex items-center justify-center font-bold text-lg">+</button>
+                    </div>
+                </div>
+                <button onclick="addToCart()"
+                    class="w-full bg-stone-900 text-white font-bold py-4 rounded-2xl shadow-lg btn-press">加入購物車</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Cart Modal -->
+    <div id="cart-modal" class="fixed inset-0 z-50 hidden">
+        <div class="absolute inset-0 bg-black/40 backdrop-blur-sm" onclick="closeCart()"></div>
+        <div id="cart-panel"
+            class="absolute bottom-0 left-0 right-0 bg-stone-50 h-[85vh] rounded-t-3xl flex flex-col transition-transform duration-300 translate-y-full shadow-2xl">
+            <!-- Header -->
+            <div
+                class="bg-white px-6 py-4 rounded-t-3xl border-b border-stone-100 flex justify-between items-center flex-shrink-0">
+                <h3 class="font-black text-xl text-stone-800">購物車</h3>
+                <button onclick="clearCart()"
+                    class="text-xs font-bold text-red-500 bg-red-50 px-3 py-1.5 rounded-full">清空</button>
+            </div>
+            <!-- Items -->
+            <div id="cart-items-container" class="flex-grow overflow-y-auto p-4 space-y-3">
+                <!-- Items Rendered Here -->
+            </div>
+            <!-- Checkout Footer -->
+            <div class="bg-white p-6 border-t border-stone-100 flex-shrink-0 safe-pb">
+                <!-- Checkout Forms (Condensed) -->
+                <div class="space-y-4 pt-2 border-t border-stone-100">
+                    <div class="flex gap-2">
+                        <button onclick="setShipMethod('pickup')" id="btn-ship-pickup"
+                            class="flex-1 py-2 rounded-xl text-xs font-bold bg-orange-100 text-orange-600 border border-orange-200">攤位自取</button>
+                        <button onclick="setShipMethod('cvs')" id="btn-ship-cvs"
+                            class="flex-1 py-2 rounded-xl text-xs font-bold bg-stone-50 text-stone-400 border border-transparent">超商取貨</button>
+                        <button onclick="setShipMethod('home')" id="btn-ship-home"
+                            class="flex-1 py-2 rounded-xl text-xs font-bold bg-stone-50 text-stone-400 border border-transparent">宅配到府</button>
+                    </div>
+
+                    <!-- Pickup Info -->
+                    <div id="ship-pickup-info" class="text-xs text-stone-500 bg-stone-50 p-3 rounded-xl">
+                        <p class="font-bold mb-2">預約自取時間</p>
+                        <input type="datetime-local" id="pickup-time"
+                            class="w-full bg-white rounded-lg p-2 border border-stone-200 outline-none">
+                        <p class="mt-2 text-[10px] text-stone-400">*請於園遊會營業時間內前往攤位取貨</p>
+                    </div>
+
+                    <!-- CVS Pickup (Renamed from ship-store-info) -->
+                    <div id="ship-cvs-info" class="text-xs text-stone-500 bg-stone-50 p-3 rounded-xl hidden">
+                        <div>
+                            <p class="font-bold mb-2">選擇取貨門市</p>
+                            <div class="grid grid-cols-2 gap-2 mb-2">
+                                <select id="cvs-type" onchange="loadCVSCities()"
+                                    class="bg-white rounded-lg p-2 border border-stone-200">
+                                    <option value="7-11">7-11</option>
+                                    <option value="FamilyMart">全家</option>
+                                </select>
+                                <select id="cvs-city" onchange="loadCVSStores()"
+                                    class="bg-white rounded-lg p-2 border border-stone-200">
+                                    <option>縣市</option>
+                                </select>
+                                <select id="cvs-dist" onchange="filterCVSStores()"
+                                    class="bg-white rounded-lg p-2 border border-stone-200 col-span-2">
+                                    <option>區域</option>
+                                </select>
+                            </div>
+                            <div id="cvs-list" class="max-h-40 overflow-y-auto space-y-2 mb-2">
+                                <!-- Store List -->
+                            </div>
+                            <input type="text" id="ship-store-name" placeholder="或手動輸入門市名稱"
+                                class="w-full bg-white rounded-lg p-2 border border-stone-200">
+                        </div>
+                    </div>
+
+                    <!-- Home Delivery Address -->
+                    <div id="ship-home-info" class="space-y-2 hidden">
+                        <div class="flex gap-2">
+                            <input type="text" id="ship-zip" placeholder="郵遞區號" oninput="handleZipInput(this.value)"
+                                class="w-24 bg-stone-50 rounded-xl px-3 py-2 text-base font-bold outline-none">
+                            <select id="ship-city" onchange="handleCityChange()"
+                                class="flex-1 bg-stone-50 rounded-xl px-3 py-2 text-base font-bold outline-none border border-stone-200">
+                                <option value="">縣市</option>
+                            </select>
+                            <select id="ship-dist" onchange="handleDistChange()"
+                                class="flex-1 bg-stone-50 rounded-xl px-3 py-2 text-base font-bold outline-none border border-stone-200">
+                                <option value="">區域</option>
+                            </select>
+                        </div>
+                        <input type="text" id="ship-road" list="road-list" placeholder="路名 (可選)"
+                            class="w-full bg-stone-50 rounded-xl px-3 py-2 text-base font-bold outline-none">
+                        <datalist id="road-list"></datalist>
+                        <input type="text" id="ship-addr-detail" placeholder="門牌號碼、樓層"
+                            class="w-full bg-stone-50 rounded-xl px-3 py-2 text-base font-bold outline-none">
+                    </div>
+
+                    <div class="space-y-2">
+                        <input type="text" id="chk-name" placeholder="訂購人姓名"
+                            class="w-full bg-stone-50 rounded-xl px-3 py-2 text-base font-bold outline-none">
+                        <input type="tel" id="chk-phone" placeholder="聯絡電話" inputmode="numeric"
+                            oninput="this.value = this.value.replace(/[^0-9]/g, '')"
+                            class="w-full bg-stone-50 rounded-xl px-3 py-2 text-base font-bold outline-none">
+                    </div>
+                </div>
+
+                <div class="flex items-end justify-between mb-4">
+                    <div class="text-xs font-bold text-stone-400">
+                        <p>小計 $<span id="cart-subtotal">0</span></p>
+                        <p>運費 $<span id="cart-shipping">0</span></p>
+                    </div>
+                    <p class="text-3xl font-black text-orange-600">$<span id="cart-final-total">0</span></p>
+                </div>
+
+                <button onclick="submitOrder()" id="btn-checkout"
+                    class="w-full bg-stone-900 text-white font-bold py-4 rounded-2xl shadow-xl btn-press">
+                    確認結帳
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- LOGIC -->
+    <script>
+        // CONFIG
+        const GAS_URL = 'https://script.google.com/macros/s/AKfycbzJb6Noa0JqX6NoOQF8L4EINrryt7P4MdRQN6SC34I_-38LwVpNZSYuMRvn6GP578zO4A/exec';
+        const LIFF_ID = '2008678090-SEONUKky';
+
+        // STATE
+        let app = {
+            view: 'home', // home, store, seller
+            user: { id: 'Guest', name: 'Guest', img: '' },
+            eventId: new URLSearchParams(window.location.search).get('eventId') || 'default', // Get Event ID
+            stores: [], // List of stores for Home
+            currentStore: null, // { info, products } for Store View
+            cart: [], // { pid, name, price, qty, spec, storeId }
+            cartStoreId: null, // Lock cart to this store
+            shippingMethod: 'pickup', // pickup, cvs, home
+
+            // Pending Uploads
+            storeImgBase64: null,
+            prodImgBase64: null
+        };
+
+        function fixDriveUrl(url) {
+            if (!url || !url.includes('drive.google.com')) return url;
+            let match = url.match(/[?&]id=([-\w]{25,})/);
+            if (match && match[1]) {
+                return `https://drive.google.com/thumbnail?id=${match[1]}&sz=w1000`;
+            }
+            return url;
+        }
+
+        // --- INIT ---
+        let TW_ADDRESS_DATA = [];
+        let CVS_STORES = [];
+
+        window.onload = async () => {
+            await initLIFF();
+            initBankSelect();
+            initAddressData(); // Load Address JSON
+            loadCVSCities(); // Init CVS
+            await loadStores(); // Fetch Store List
+            loadCartLocal();
+            renderHome();
+            document.getElementById('loading-screen').classList.add('opacity-0', 'pointer-events-none');
+            // Init Default Ship View - Moved to openCart or goToStore
+        };
+
+        // --- ADDRESS LOGIC ---
+        async function initAddressData() {
+            try {
+                const res = await fetch('https://raw.githubusercontent.com/donma/TaiwanAddressCityAreaRoadChineseEnglishJSON/master/AllData.json');
+                TW_ADDRESS_DATA = await res.json();
+
+                // Populate City Select
+                const citySel = document.getElementById('ship-city');
+                citySel.innerHTML = '<option value="">縣市</option>' + TW_ADDRESS_DATA.map(c => `<option value="${c.CityName}">${c.CityName}</option>`).join('');
+            } catch (e) { console.error('Address Load Failed', e); }
+        }
+
+        function handleCityChange() {
+            const city = document.getElementById('ship-city').value;
+            const distSel = document.getElementById('ship-dist');
+            const zipInput = document.getElementById('ship-zip');
+
+            distSel.innerHTML = '<option value="">區域</option>';
+            zipInput.value = ''; // Reset Zip
+
+            if (!city) return;
+
+            const cityData = TW_ADDRESS_DATA.find(c => c.CityName === city);
+            if (cityData) {
+                distSel.innerHTML = '<option value="">區域</option>' + cityData.AreaList.map(a => `<option value="${a.AreaName}">${a.AreaName}</option>`).join('');
+            }
+        }
+
+        function handleDistChange() {
+            const city = document.getElementById('ship-city').value;
+            const dist = document.getElementById('ship-dist').value;
+            const zipInput = document.getElementById('ship-zip');
+
+            if (city && dist) {
+                const cityData = TW_ADDRESS_DATA.find(c => c.CityName === city);
+                const areaData = cityData ? cityData.AreaList.find(a => a.AreaName === dist) : null;
+                if (areaData) {
+                    zipInput.value = areaData.ZipCode;
+                }
+            }
+        }
+
+        // Handle Zip Input (Auto-fill)
+        function handleZipInput(val) {
+            if (val.length < 3) return;
+            // Search in Data
+            for (const city of TW_ADDRESS_DATA) {
+                for (const area of city.AreaList) {
+                    if (area.ZipCode === val || area.ZipCode.startsWith(val)) {
+                        // Sync UI
+                        document.getElementById('ship-city').value = city.CityName;
+
+                        // Trigger District Update Manually to populate options
+                        const distSel = document.getElementById('ship-dist');
+                        distSel.innerHTML = '<option value="">區域</option>' + city.AreaList.map(a => `<option value="${a.AreaName}">${a.AreaName}</option>`).join('');
+
+                        document.getElementById('ship-dist').value = area.AreaName;
+
+                        // Populate Road Datalist
+                        const dl = document.getElementById('road-list');
+                        dl.innerHTML = '';
+                        if (area.RoadList) {
+                            area.RoadList.forEach(r => {
+                                const opt = document.createElement('option');
+                                opt.value = r.RoadName;
+                                dl.appendChild(opt);
+                            });
+                        }
+                        return;
+                    }
+                }
+            }
+        }
+
+        // --- CVS LOGIC ---
+        async function loadCVSCities() {
+            const sel = document.getElementById('cvs-city');
+            if (!sel) return; // Prevent Null Error if element not ready
+            // Hardcode or get from data? 7-11 JSONs are by City.
+            const CITIES = ["基隆市", "台北市", "新北市", "桃園市", "新竹市", "新竹縣", "苗栗縣", "台中市", "彰化縣", "南投縣", "雲林縣", "嘉義市", "嘉義縣", "台南市", "高雄市", "屏東縣", "宜蘭縣", "花蓮縣", "台東縣", "澎湖縣", "金門縣", "連江縣"];
+            sel.innerHTML = '<option value="">選擇縣市</option>' + CITIES.map(c => `<option value="${c}">${c}</option>`).join('');
+        }
+
+        async function loadCVSStores() {
+            const brand = document.getElementById('cvs-type').value; // 7-11 or FamilyMart
+            const city = document.getElementById('cvs-city').value;
+            if (!city) return;
+
+            const list = document.getElementById('cvs-list');
+            list.innerHTML = '載入中...';
+
+            // Mapping for URL
+            // ctiml repo: 7-11/{City}.json, Familymart/{City}.json
+            // Note: Repo uses English or Chinese? Repo uses Chinese filename e.g. "新北市.json"
+            // Brand Check: "7-11" or "FamilyMart"
+            // Fix: Repo uses lowercase "familymart"
+            let brandPath = brand === '7-11' ? '7-11' : 'familymart';
+
+            try {
+                const url = `https://raw.githubusercontent.com/ctiml/convenience-store-data/master/${brandPath}/${city}.json`;
+                const res = await fetch(url);
+                const json = await res.json();
+
+                // Fix: Data is in json.stores array
+                const rawStores = json.stores || [];
+
+                // Normalize Data: 7-11 uses POIName/Address, Family uses NAME/addr
+                CVS_STORES = rawStores.map(s => ({
+                    name: s.POIName || s.NAME,
+                    address: s.Address || s.addr,
+                    // Preserve original for reference if needed
+                    _raw: s
+                }));
+
+                // Populate Districts
+                // Extract districts from address (e.g. "基隆市仁愛區...")
+                const dists = [...new Set(CVS_STORES.map(s => {
+                    // Simple regex to grab District
+                    const m = s.address.match(/(.+?[市縣])?(.+?[區鄉鎮市])/);
+                    return m ? m[2] : '其他';
+                }))];
+
+                const distSel = document.getElementById('cvs-dist');
+                distSel.innerHTML = '<option value="">全區域</option>' + dists.map(d => `<option value="${d}">${d}</option>`).join('');
+                filterCVSStores();
+
+            } catch (e) {
+                console.error(e);
+                list.innerHTML = '載入失敗，請稍後再試或手動輸入';
+            }
+        }
+
+        function filterCVSStores() {
+            const dist = document.getElementById('cvs-dist').value;
+            const list = document.getElementById('cvs-list');
+            list.innerHTML = '';
+
+            const filtered = dist ? CVS_STORES.filter(s => s.address.includes(dist)) : CVS_STORES;
+
+            filtered.forEach(s => {
+                const div = document.createElement('div');
+                div.className = 'p-2 bg-stone-100 rounded text-xs cursor-pointer hover:bg-orange-100';
+                div.innerHTML = `<b>${s.name}</b><br><span class="text-stone-400">${s.address}</span>`;
+                div.onclick = () => {
+                    document.getElementById('ship-store-name').value = `${s.name} (${s.address})`;
+                    // Highlight selection
+                };
+                list.appendChild(div);
+            });
+        }
+
+        async function initBankSelect() {
+            const sel = document.getElementById('set-bank-code');
+            sel.innerHTML = '<option>載入銀行列表中...</option>';
+            try {
+                // Fetch Taiwan Bank List (Open Data / GitHub)
+                const res = await fetch('https://raw.githubusercontent.com/nczz/taiwan-banks-list/main/banks_sort_by_codes.json');
+                const data = await res.json();
+
+                // Render Options: [Code] Name
+                // Some banks share codes (e.g. Farmers Assn), so we list them all.
+                sel.innerHTML = '<option value="">選擇銀行</option>' +
+                    data.map(b => `<option value="${b.bank_code} ${b.name}">[${b.bank_code}] ${b.name}</option>`).join('');
+            } catch (e) {
+                console.error(e);
+                sel.innerHTML = '<option value="">銀行列表載入失敗</option>';
+            }
+        }
+
+        async function initLIFF() {
+            try {
+                await liff.init({ liffId: LIFF_ID });
+                if (liff.isLoggedIn()) {
+                    const p = await liff.getProfile();
+                    app.user = { id: p.userId, name: p.displayName, img: p.pictureUrl };
+                    document.getElementById('user-avatar').src = p.pictureUrl;
+                    document.getElementById('user-avatar').classList.remove('hidden');
+                } else {
+                    liff.login();
+                }
+            } catch (e) { console.error('LIFF Error', e); }
+        }
+
+        async function loadStores() {
+            try {
+                const res = await fetch(`${GAS_URL}?action=getStores&eventId=${app.eventId}`);
+                const json = await res.json();
+                app.stores = json.stores || [];
+            } catch (e) { alert('載入失敗'); }
+        }
+
+        // --- NAVIGATION ---
+        function goHome() {
+            app.view = 'home';
+            app.currentStore = null;
+            updateViewUI();
+        }
+
+        async function goToStore(storeId) {
+            document.getElementById('loading-screen').classList.remove('opacity-0', 'pointer-events-none');
+            try {
+                // Add timestamp to prevent caching
+                const res = await fetch(`${GAS_URL}?action=getStoreData&storeId=${storeId}&eventId=${app.eventId}&_t=${Date.now()}`);
+                const json = await res.json();
+                app.currentStore = {
+                    info: json.store || {},
+                    products: json.products || []
+                };
+                app.view = 'store';
+                updateViewUI();
+            } catch (e) { alert('進入商店失敗'); }
+            document.getElementById('loading-screen').classList.add('opacity-0', 'pointer-events-none');
+        }
+
+        function toggleSellerMode() {
+            if (app.view === 'seller') {
+                goHome(); // Exit
+            } else {
+                app.view = 'seller';
+                updateViewUI();
+            }
+        }
+
+        function updateViewUI() {
+            // Hide all views
+            ['view-home', 'view-store', 'view-seller'].forEach(id => document.getElementById(id).classList.add('hidden'));
+            document.getElementById('cart-float-btn').classList.add('opacity-0', 'translate-y-20');
+            document.getElementById('back-btn').classList.add('hidden');
+
+            const sellerBtn = document.getElementById('seller-btn');
+
+            if (app.view === 'home') {
+                document.getElementById('view-home').classList.remove('hidden');
+                document.getElementById('page-title').innerHTML = '<span class="text-2xl">🎪</span> 園遊會主會場';
+                sellerBtn.innerHTML = '<span>我要擺攤</span>';
+                sellerBtn.classList.replace('bg-stone-800', 'bg-orange-600');
+                renderHome();
+            }
+            else if (app.view === 'store') {
+                document.getElementById('view-store').classList.remove('hidden');
+                document.getElementById('back-btn').classList.remove('hidden');
+
+                const info = app.currentStore.info;
+                document.getElementById('page-title').innerText = info.Name || '攤位';
+                document.getElementById('store-page-name').innerText = info.Name || '未命名攤位';
+                document.getElementById('store-page-desc').innerText = info.Description || '歡迎光臨';
+                document.getElementById('store-cover-img').src = info.Image && info.Image.startsWith('http') ? fixDriveUrl(info.Image) : 'https://placehold.co/100';
+
+                // Hide if -1
+                const costHome = parseInt(info.Shipping_Home);
+                const costStore = parseInt(info.Shipping_Store);
+
+                document.getElementById('store-ship-home').innerText = costHome >= 0 ? `🚚 宅配 $${costHome}` : '';
+                document.getElementById('store-ship-home').style.display = costHome >= 0 ? '' : 'none';
+
+                document.getElementById('store-ship-store').innerText = costStore >= 0 ? `🏪 超商 $${costStore}` : '';
+                document.getElementById('store-ship-store').style.display = costStore >= 0 ? '' : 'none';
+
+                renderProductGrid();
+                updateCartUI(); // Show float button if cart has items
+            }
+            else if (app.view === 'seller') {
+                document.getElementById('view-seller').classList.remove('hidden');
+                document.getElementById('page-title').innerText = '攤主中心';
+                sellerBtn.innerHTML = '<span>回主會場</span>';
+                sellerBtn.classList.replace('bg-orange-600', 'bg-stone-800');
+
+                // Pre-fill User Info if exists in store list
+                const myStore = app.stores.find(s => s.StoreID === app.user.id);
+                if (myStore) {
+                    document.getElementById('set-store-name').value = myStore.Name;
+                    document.getElementById('set-store-desc').value = myStore.Description;
+
+                    // Parse Bank Info (Try JSON, fallback to string)
+                    try {
+                        const bank = JSON.parse(myStore.BankInfo);
+                        document.getElementById('set-bank-code').value = bank.code || '';
+                        document.getElementById('set-bank-acc').value = bank.acc || '';
+                        document.getElementById('set-bank-name').value = bank.name || '';
+                    } catch (e) {
+                        // Old format or empty
+                        document.getElementById('set-bank-acc').value = myStore.BankInfo || '';
+                        document.getElementById('set-bank-code').value = '';
+                        document.getElementById('set-bank-name').value = '';
+                    }
+
+                    document.getElementById('preview-store-img').src = fixDriveUrl(myStore.Image);
+                    document.getElementById('preview-store-img').classList.remove('hidden');
+
+                    // Init Shipping Toggles
+                    const homePrice = parseInt(myStore.Shipping_Home);
+                    initShipToggle('home', isNaN(homePrice) ? 100 : homePrice);
+
+                    const storePrice = parseInt(myStore.Shipping_Store);
+                    initShipToggle('store', isNaN(storePrice) ? 60 : storePrice);
+
+                    // Init Pickup Toggle
+                    let pkEn = true;
+                    try {
+                        const bank = JSON.parse(myStore.BankInfo || '{}');
+                        // If pickupEnabled key exists, use it. Else default true.
+                        if (bank.hasOwnProperty('pickupEnabled')) pkEn = bank.pickupEnabled;
+
+                        // Pickup Info Inputs
+                        document.getElementById('set-pickup-loc').value = bank.pickupLoc || '';
+                        document.getElementById('set-pickup-tel').value = bank.pickupTel || '';
+                    } catch (e) { }
+
+                    document.getElementById('enable-ship-pickup').checked = pkEn;
+                    togglePickupInput(); // Sync inputs state
+
+                } else {
+                    // New Store - Default to User Profile
+                    document.getElementById('set-store-name').value = app.user.name;
+                    document.getElementById('preview-store-img').src = fixDriveUrl(app.user.img);
+                    document.getElementById('preview-store-img').classList.remove('hidden');
+                    document.getElementById('set-bank-code').value = '';
+                    document.getElementById('set-bank-acc').value = '';
+                    document.getElementById('set-bank-name').value = '';
+                    document.getElementById('set-pickup-loc').value = '';
+                    document.getElementById('set-pickup-tel').value = '';
+
+                    // Default Defaults
+                    initShipToggle('home', 100);
+                    initShipToggle('store', 60);
+
+                    document.getElementById('enable-ship-pickup').checked = true;
+                    togglePickupInput();
+                }
+
+                // Fetch My Products
+                fetchMyProducts();
+                // Auto Fetch Orders
+                fetchSellerOrders();
+            }
+
+            window.scrollTo(0, 0);
+        }
+
+        // Helper for Toggles
+        function initShipToggle(type, price) {
+            const chk = document.getElementById(`enable-ship-${type}`);
+            const inp = document.getElementById(`set-ship-${type}`);
+
+            if (price >= 0) {
+                chk.checked = true;
+                inp.value = price;
+                inp.disabled = false;
+            } else {
+                chk.checked = false;
+                inp.value = type === 'home' ? 100 : 60; // Default when re-enabled
+                inp.disabled = true;
+            }
+        }
+
+        function toggleShipInput(type) {
+            const chk = document.getElementById(`enable-ship-${type}`);
+            const inp = document.getElementById(`set-ship-${type}`);
+            inp.disabled = !chk.checked;
+            if (chk.checked) inp.focus();
+        }
+
+        function togglePickupInput() {
+            const chk = document.getElementById('enable-ship-pickup');
+            const loc = document.getElementById('set-pickup-loc');
+            const tel = document.getElementById('set-pickup-tel');
+            loc.disabled = !chk.checked;
+            tel.disabled = !chk.checked;
+        }
+
+        // --- RENDERERS ---
+        function renderHome() {
+            const container = document.getElementById('store-list');
+            if (app.stores.length === 0) {
+                container.innerHTML = '<p class="text-center text-stone-400 py-10">目前沒有攤位，快來擺攤吧！</p>';
+                return;
+            }
+            container.innerHTML = app.stores.map(s => `
+                <div onclick="goToStore('${s.StoreID}')" class="bg-white rounded-2xl p-4 shadow-sm flex items-center gap-4 active:scale-95 transition-transform cursor-pointer">
+                    <img src="${s.Image && s.Image.startsWith('http') ? fixDriveUrl(s.Image) : 'https://placehold.co/80'}" class="w-16 h-16 rounded-full bg-stone-100 object-cover">
+                    <div>
+                        <h3 class="font-bold text-lg text-stone-800">${s.Name}</h3>
+                        <p class="text-xs text-stone-500 line-clamp-1">${s.Description || 'No description'}</p>
+                    </div>
+                    <div class="ml-auto text-stone-300">➜</div>
+                </div>
+            `).join('');
+        }
+
+        function renderProductGrid() {
+            const container = document.getElementById('product-grid');
+            const products = app.currentStore.products;
+            if (products.length === 0) {
+                container.innerHTML = '<div class="col-span-2 text-center text-stone-400 py-10">攤主還沒準備好商品...</div>';
+                return;
+            }
+            container.innerHTML = products.map((p, idx) => `
+                <div onclick="openProductModal(${idx})" class="bg-white rounded-2xl p-3 shadow-sm active:scale-95 transition-transform cursor-pointer">
+                    <img src="${p.Image && p.Image.startsWith('http') ? fixDriveUrl(p.Image) : 'https://placehold.co/200'}" class="w-full aspect-square rounded-xl object-cover bg-stone-100 mb-2">
+                    <h4 class="font-bold text-stone-800 text-sm truncate">${p.Name}</h4>
+                    <p class="text-orange-600 font-bold">${p.Price == 0 ? '免費' : '$' + p.Price}</p>
+                </div>
+            `).join('');
+        }
+
+        // --- CART LOGIC ---
+        let currentModalProduct = null;
+        let currentModalSpecs = {};
+
+        function openProductModal(idx) {
+            const p = app.currentStore.products[idx];
+            currentModalProduct = p;
+            currentModalSpecs = {};
+
+            document.getElementById('modal-img').src = p.Image && p.Image.startsWith('http') ? fixDriveUrl(p.Image) : 'https://placehold.co/300';
+            document.getElementById('modal-name').innerText = p.Name;
+            document.getElementById('modal-price').innerText = p.Price == 0 ? '免費' : `$${p.Price}`;
+            document.getElementById('modal-qty').innerText = '1';
+
+            // Render Specs
+            const specs = JSON.parse(p.Specs || '{}');
+            const container = document.getElementById('modal-specs');
+            container.innerHTML = '';
+            Object.keys(specs).forEach(key => {
+                const vals = specs[key];
+                const html = `
+                    <div class="space-y-2">
+                        <p class="text-xs font-bold text-stone-400">${key}</p>
+                        <div class="flex flex-wrap gap-2">
+                            ${vals.map((v, i) => `
+                                <button onclick="selectSpec('${key}', '${v}')" class="spec-btn spec-${key}-${v} px-3 py-1.5 rounded-lg border border-stone-100 text-xs font-bold ${i === 0 ? 'bg-stone-800 text-white border-stone-800' : 'bg-white text-stone-500'}">
+                                    ${v}
+                                </button>
+                            `).join('')}
+                        </div>
+                    </div>
+                `;
+                container.innerHTML += html;
+                currentModalSpecs[key] = vals[0]; // Default first
+            });
+
+            const modal = document.getElementById('product-modal');
+            modal.classList.remove('hidden');
+            setTimeout(() => modal.children[1].classList.remove('translate-y-full'), 10);
+        }
+
+        function selectSpec(key, val) {
+            currentModalSpecs[key] = val;
+            // Update UI
+            document.querySelectorAll(`.spec-btn[class*="spec-${key}-"]`).forEach(el => {
+                el.classList.remove('bg-stone-800', 'text-white', 'border-stone-800');
+                el.classList.add('bg-white', 'text-stone-500');
+            });
+            const active = document.querySelector(`.spec-${key}-${val}`);
+            active.classList.add('bg-stone-800', 'text-white', 'border-stone-800');
+            active.classList.remove('bg-white', 'text-stone-500');
+        }
+
+        function updateModalQty(d) {
+            let q = parseInt(document.getElementById('modal-qty').innerText) + d;
+            if (q < 1) q = 1;
+            document.getElementById('modal-qty').innerText = q;
+        }
+
+        function closeProductModal() {
+            const modal = document.getElementById('product-modal');
+            modal.children[1].classList.add('translate-y-full');
+            setTimeout(() => modal.classList.add('hidden'), 300);
+        }
+
+        function addToCart() {
+            // Check Store Lock
+            const storeId = app.currentStore.info.StoreID;
+            if (app.cartStoreId && app.cartStoreId !== storeId) {
+                if (!confirm('您的購物車內已有其他攤位的商品。是否清空購物車以購買此攤位商品？')) return;
+                app.cart = [];
+                app.cartStoreId = null;
+            }
+
+            app.cartStoreId = storeId;
+            const item = {
+                pid: currentModalProduct.ID,
+                name: currentModalProduct.Name,
+                price: currentModalProduct.Price,
+                image: currentModalProduct.Image,
+                spec: { ...currentModalSpecs },
+                qty: parseInt(document.getElementById('modal-qty').innerText),
+                storeId: storeId
+            };
+
+            // Check duplicate
+            const specStr = JSON.stringify(item.spec);
+            const exist = app.cart.find(i => i.pid === item.pid && JSON.stringify(i.spec) === specStr);
+            if (exist) exist.qty += item.qty;
+            else app.cart.push(item);
+
+            saveCartLocal();
+            closeProductModal();
+            updateCartUI();
+
+            // Animation
+            confetti({ particleCount: 50, spread: 60, origin: { y: 0.8 }, colors: ['#f97316'] });
+        }
+
+        // --- CART UI & ACTIONS ---
+        function updateCartUI() {
+            // Reset float btn
+            const btn = document.getElementById('cart-float-btn');
+            if (app.cart.length > 0 && app.view === 'store' && app.currentStore.info.StoreID === app.cartStoreId) {
+                const count = app.cart.reduce((a, b) => a + b.qty, 0);
+                const total = app.cart.reduce((a, b) => a + b.price * b.qty, 0);
+                document.getElementById('cart-count').innerText = count;
+                document.getElementById('cart-total-float').innerText = `$${total}`;
+                btn.classList.remove('opacity-0', 'translate-y-20');
+            } else {
+                btn.classList.add('opacity-0', 'translate-y-20');
+            }
+        }
+
+        function openCart() {
+            const modal = document.getElementById('cart-modal');
+            renderCartItems();
+            modal.classList.remove('hidden');
+            setTimeout(() => document.getElementById('cart-panel').classList.remove('translate-y-full'), 10);
+
+            // Init Method availability
+            const info = app.currentStore.info;
+            const canHome = parseInt(info.Shipping_Home) >= 0;
+            const canStore = parseInt(info.Shipping_Store) >= 0;
+            const canPickup = true; // Always true
+
+            document.getElementById('btn-ship-home').style.display = canHome ? '' : 'none';
+            document.getElementById('btn-ship-cvs').style.display = canStore ? '' : 'none';
+            document.getElementById('btn-ship-pickup').style.display = canPickup ? '' : 'none';
+
+            // Auto switch if current invalid
+            if (app.shippingMethod === 'home' && !canHome) app.shippingMethod = 'pickup';
+            if (app.shippingMethod === 'cvs' && !canStore) app.shippingMethod = 'pickup';
+
+            setShipMethod(app.shippingMethod || 'pickup');
+        }
+
+        function closeCart() {
+            document.getElementById('cart-panel').classList.add('translate-y-full');
+            setTimeout(() => document.getElementById('cart-modal').classList.add('hidden'), 300);
+        }
+
+        function clearCart() {
+            app.cart = [];
+            app.cartStoreId = null;
+            saveCartLocal();
+            closeCart();
+            updateCartUI();
+        }
+
+        function renderCartItems() {
+            const container = document.getElementById('cart-items-container');
+            if (app.cart.length === 0) { container.innerHTML = '<p class="text-center text-stone-400 py-10">空空如也</p>'; return; }
+
+            container.innerHTML = app.cart.map((item, idx) => `
+                <div class="flex gap-3 bg-white p-3 rounded-2xl shadow-sm border border-stone-50">
+                    <img src="${fixDriveUrl(item.image)}" class="w-14 h-14 rounded-lg bg-stone-100 object-cover" onerror="this.src='https://placehold.co/100'">
+                    <div class="flex-grow">
+                        <h4 class="font-bold text-stone-800">${item.name}</h4>
+                        <p class="text-xs text-stone-400">${Object.values(item.spec).join('/')}</p>
+                        <p class="text-orange-600 font-bold">${item.price == 0 ? '免費' : '$' + item.price}</p>
+                    </div>
+                     <div class="flex items-center gap-2 bg-stone-100 rounded-lg p-1 h-8 self-end">
+                        <button onclick="updateCartQty(${idx}, -1)" class="w-6 font-bold text-stone-500">-</button>
+                        <span class="text-xs font-bold w-4 text-center">${item.qty}</span>
+                        <button onclick="updateCartQty(${idx}, 1)" class="w-6 font-bold text-stone-500">+</button>
+                    </div>
+                </div>
+            `).join('');
+            calcTotal();
+        }
+
+        function updateCartQty(idx, d) {
+            app.cart[idx].qty += d;
+            if (app.cart[idx].qty <= 0) app.cart.splice(idx, 1);
+            if (app.cart.length === 0) clearCart();
+            else {
+                saveCartLocal();
+                renderCartItems();
+                updateCartUI();
+            }
+        }
+
+        function setShipMethod(m) {
+            app.shippingMethod = m;
+
+            // Check availability again (safety)
+            const info = app.currentStore.info;
+            // ... (Already handled in openCart mostly, but UI Toggle here)
+
+            // Update Buttons
+            const activeClass = "flex-1 py-2 rounded-xl border border-stone-800 bg-stone-800 text-white shadow-md transition-all";
+            const inactiveClass = "flex-1 py-2 rounded-xl border border-transparent text-stone-400 hover:bg-stone-100 transition-all";
+
+            document.getElementById('btn-ship-pickup').className = m === 'pickup' ? activeClass : inactiveClass;
+            document.getElementById('btn-ship-cvs').className = m === 'cvs' ? activeClass : inactiveClass;
+            document.getElementById('btn-ship-home').className = m === 'home' ? activeClass : inactiveClass;
+
+            // Toggle Sections
+            const pickupInfo = document.getElementById('ship-pickup-info');
+            const cvsInfo = document.getElementById('ship-cvs-info');
+            const homeInfo = document.getElementById('ship-home-info');
+
+            if (m === 'pickup') {
+                pickupInfo.classList.remove('hidden');
+                cvsInfo.classList.add('hidden');
+                homeInfo.classList.add('hidden');
+
+                // Show Pickup Details
+                const info = app.currentStore.info;
+                let loc = '攤位現場';
+                let tel = '';
+                try {
+                    const bank = JSON.parse(info.BankInfo || '{}');
+                    if (bank.pickupLoc) loc = bank.pickupLoc;
+                    if (bank.pickupTel) tel = bank.pickupTel;
+                } catch (e) { }
+
+                // Update text
+                // Check if container exists, if not create/update?
+                // Currently pickupInfo only has time input. We should prepend/append info.
+
+                // Reset content
+                pickupInfo.innerHTML = `
+                    <p class="text-xs font-bold text-stone-500 mb-2">請選擇取貨時間</p>
+                    <input type="datetime-local" id="pickup-time" 
+                        class="w-full bg-stone-50 rounded-xl px-3 py-2 text-base font-bold outline-none mb-2">
+                    <div class="bg-orange-50 p-3 rounded-xl border border-orange-100 text-xs space-y-1">
+                        <p class="font-bold text-stone-700">📍 取貨地點：${loc}</p>
+                        ${tel ? `<p class="font-bold text-stone-700">📞 攤主電話：${tel}</p>` : ''}
+                    </div>
+                `;
+
+            } else if (m === 'cvs') {
+                pickupInfo.classList.add('hidden');
+                cvsInfo.classList.remove('hidden');
+                homeInfo.classList.add('hidden');
+            } else { // home
+                pickupInfo.classList.add('hidden');
+                cvsInfo.classList.add('hidden');
+                homeInfo.classList.remove('hidden');
+            }
+
+            calcTotal();
+        }
+
+        function calcTotal() {
+            const subtotal = app.cart.reduce((a, b) => a + b.price * b.qty, 0);
+            let shipFee = 0;
+
+            if (app.shippingMethod === 'home') {
+                shipFee = parseInt(app.currentStore.info.Shipping_Home || 100);
+            } else if (app.shippingMethod === 'cvs') {
+                shipFee = parseInt(app.currentStore.info.Shipping_Store || 60);
+            } else {
+                // pickup = 0
+                shipFee = 0;
+            }
+
+            document.getElementById('cart-subtotal').innerText = subtotal;
+            document.getElementById('cart-shipping').innerText = shipFee;
+            document.getElementById('cart-final-total').innerText = subtotal + shipFee;
+        }
+
+        async function submitOrder() {
+            const name = document.getElementById('chk-name').value;
+            const phone = document.getElementById('chk-phone').value;
+
+            let addr = '';
+
+            // Validation per method
+            if (app.shippingMethod === 'pickup') {
+                const time = document.getElementById('pickup-time').value;
+                if (!time) return alert('請選擇預約自取時間');
+                addr = `[自取預約] ${time.replace('T', ' ')}`;
+            }
+            else if (app.shippingMethod === 'cvs') {
+                addr = document.getElementById('ship-store-name').value;
+                if (!addr) return alert('請選擇或輸入取貨門市');
+            }
+            else { // home
+                const city = document.getElementById('ship-city').value;
+                const dist = document.getElementById('ship-dist').value;
+                const road = document.getElementById('ship-road').value;
+                const detail = document.getElementById('ship-addr-detail').value;
+                if (!city || !dist || !detail) return alert('請填寫完整收件地址');
+                addr = `${document.getElementById('ship-zip').value} ${city}${dist}${road}${detail}`;
+            }
+
+            if (!name || !phone) return alert('請填寫姓名與電話');
+
+            const btn = document.getElementById('btn-checkout');
+            btn.innerHTML = '處理中...';
+            btn.disabled = true;
+
+            const subtotal = app.cart.reduce((a, b) => a + b.price * b.qty, 0);
+            let shipFee = 0;
+            if (app.shippingMethod === 'home') shipFee = parseInt(app.currentStore.info.Shipping_Home || 100);
+            if (app.shippingMethod === 'cvs') shipFee = parseInt(app.currentStore.info.Shipping_Store || 60);
+
+            const payload = {
+                action: 'submitOrder',
+                eventId: app.eventId,
+                data: {
+                    eventId: app.eventId,
+                    storeId: app.cartStoreId,
+                    memberId: app.user.id,
+                    memberName: app.user.name,
+                    recipientName: name,
+                    recipientPhone: phone,
+                    method: app.shippingMethod,
+                    address: addr,
+                    items: app.cart,
+                    total: subtotal + shipFee
+                }
+            };
+
+            try {
+                const res = await fetch(`${GAS_URL}?eventId=${app.eventId}`, { method: 'POST', body: JSON.stringify(payload) });
+                const json = await res.json();
+                if (json.result === 'success') {
+                    alert('🎉 訂單已送出！');
+                    clearCart();
+                } else alert('Error: ' + json.message);
+            } catch (e) { alert('連線失敗'); }
+
+            btn.innerHTML = '確認結帳';
+            btn.disabled = false;
+        }
+
+        // --- SELLER API ---
+        function handleStoreImage(inp) { handleImage(inp, 'preview-store-img', (b64) => app.storeImgBase64 = b64); }
+        function handleProdImage(inp) { handleImage(inp, 'preview-prod-img', (b64) => app.prodImgBase64 = b64); }
+
+        function handleImage(inp, previewId, callback) {
+            if (inp.files && inp.files[0]) {
+                const file = inp.files[0];
+                // Compress Image (Max 800px, 0.7 quality)
+                compressImage(file, 800, 0.7).then(b64 => {
+                    document.getElementById(previewId).src = b64;
+                    document.getElementById(previewId).classList.remove('hidden');
+                    callback(b64);
+                });
+            }
+        }
+
+        function compressImage(file, maxWidth, quality) {
+            return new Promise((resolve) => {
                 const reader = new FileReader();
                 reader.readAsDataURL(file);
                 reader.onload = (e) => {
                     const img = new Image();
                     img.src = e.target.result;
                     img.onload = () => {
-                        const canvas = document.createElement('canvas');
                         let w = img.width, h = img.height;
-                        const maxSide = 1200; // 保持 1200px 限制
-                        if (w > h && w > maxSide) { h *= maxSide / w; w = maxSide; }
-                        else if (h > maxSide) { w *= maxSide / h; h = maxSide; }
+                        if (w > maxWidth) { h = Math.round(h * (maxWidth / w)); w = maxWidth; }
+                        if (h > maxWidth) { w = Math.round(w * (maxWidth / h)); h = maxWidth; } // Also check height
+
+                        const canvas = document.createElement('canvas');
                         canvas.width = w; canvas.height = h;
                         const ctx = canvas.getContext('2d');
                         ctx.drawImage(img, 0, 0, w, h);
-                        resolve(canvas.toDataURL('image/jpeg', 0.8)); 
+                        resolve(canvas.toDataURL('image/jpeg', quality));
                     };
-                    img.onerror = (err) => reject(err);
                 };
-                reader.onerror = (err) => reject(err);
             });
         }
 
-        async function processUnifiedFiles(input) {
-            const files = Array.from(input.files);
-            if (files.length === 0) return;
+        // Save Store Settings
+        async function saveStoreSettings() {
+            if (app.user.id === 'Guest') return alert('請先登入 LINE (測試環境不可用)');
 
-            const status = document.getElementById('globalStatus');
-            disableButtons(true);
-            
-            let successCount = 0;
-            let skipCount = 0;
+            const btn = document.getElementById('btn-save-store');
+            const originalText = btn.innerHTML;
+            btn.innerHTML = '儲存中...'; btn.disabled = true;
 
-            for (let i = 0; i < files.length; i++) {
-                let file = files[i];
-                // 統一檔名為 jpg (即使原本是 heic)
-                let baseName = file.name.split('.')[0];
-                const fileNameToUpload = baseName + ".jpg";
-                
-                if (isDuplicate(fileNameToUpload)) {
-                    skipCount++;
-                    continue;
+            // Collect Bank Info & Pickup Info
+            const pickupEnabled = document.getElementById('enable-ship-pickup').checked;
+            const bankData = {
+                code: document.getElementById('set-bank-code').value,
+                acc: document.getElementById('set-bank-acc').value,
+                name: document.getElementById('set-bank-name').value,
+                pickupEnabled: pickupEnabled, // Save Boolean
+                pickupLoc: document.getElementById('set-pickup-loc').value,
+                pickupTel: document.getElementById('set-pickup-tel').value
+            };
+
+            // Logic: If checkbox unchecked, value is -1
+            const shipHomeEnabled = document.getElementById('enable-ship-home').checked;
+            const shipStoreEnabled = document.getElementById('enable-ship-store').checked;
+
+            const payload = {
+                action: 'updateStore',
+                eventId: app.eventId,
+                data: {
+                    eventId: app.eventId,
+                    storeId: app.user.id,
+                    name: document.getElementById('set-store-name').value,
+                    desc: document.getElementById('set-store-desc').value,
+                    bankInfo: JSON.stringify(bankData),
+                    shipHome: shipHomeEnabled ? parseInt(document.getElementById('set-ship-home').value || 0) : -1,
+                    shipStore: shipStoreEnabled ? parseInt(document.getElementById('set-ship-store').value || 0) : -1,
+                    imageBase64: app.storeImgBase64,
+                    imageUrl: app.storeImgBase64 ? '' : document.getElementById('preview-store-img').src
                 }
+            };
 
-                status.innerText = `⏳ 正在處理 (${i + 1}/${files.length})\n${file.name}`;
-                
+            // Send
+            try {
+                // console.log('Sending Payload:', payload);
+                const res = await fetch(`${GAS_URL}?eventId=${app.eventId}`, { method: 'POST', body: JSON.stringify(payload) });
+                // Check content type
+                const text = await res.text();
                 try {
-                    const data = await compressImage(file);
-                    status.innerText = `⬆️ 正在上傳 (${i + 1}/${files.length})\n${file.name}`;
-                    const res = await uploadToGas(fileNameToUpload, data);
-                    if (res.ok) successCount++;
-                } catch (e) { 
-                    console.error("上傳出錯:", e); 
-                    status.innerText += `\n❌ ${file.name} 失敗`;
+                    const json = JSON.parse(text);
+                    if (json.result === 'success') alert('✅ 商店設定已更新');
+                    else alert('更新失敗: ' + (json.message || '未知錯誤'));
+                } catch (e) {
+                    console.error('Response Parse Error:', text);
+                    alert('伺服器回傳格式錯誤 (可能是檔案太大獲逾時)');
                 }
+            } catch (e) {
+                console.error(e);
+                alert('連線失敗: ' + e.message);
             }
 
-            let msg = `投稿完成！\n成功：${successCount} 張`;
-            if (skipCount > 0) msg += `\n跳過重複：${skipCount} 張`;
-            alert(msg);
-            
-            finishUpload(input);
+            btn.innerHTML = originalText; btn.disabled = false;
         }
 
-        async function uploadToGas(name, data) {
-            return fetch(gasUrl, { 
-                method: "POST", 
-                body: JSON.stringify({ fileName: name, fileData: data, userName: getPureUserName() })
+        // Create Product
+        async function submitProduct() {
+            if (!app.prodImgBase64 && app.editingProductIdx === null) return alert('請上傳商品照');
+            const price = parseFloat(document.getElementById('prod-price').value);
+            if (price < 0) return alert('商品價格不能為負數');
+
+            const btn = document.getElementById('submit-prod-btn');
+            btn.innerHTML = '上架中...'; btn.disabled = true;
+
+            // Collect Specs (Simplified)
+            const specs = {};
+            document.querySelectorAll('#specs-container > div').forEach(div => {
+                const k = div.querySelector('.spec-key').value;
+                const v = div.querySelector('.spec-vals').value;
+                if (k) specs[k] = v.split(',');
             });
-        }
 
-        function disableButtons(bool) {
-            const btn = document.querySelector('.upload-card-btn');
-            if(btn) { 
-                btn.style.opacity = bool ? "0.5" : "1"; 
-                btn.style.pointerEvents = bool ? "none" : "auto"; 
-            }
-        }
-
-        function finishUpload(input) {
-            document.getElementById('globalStatus').innerText = "";
-            disableButtons(false); 
-            input.value = ""; 
-            // 上傳後不強制重整，因為後端尚未分類
-        }
-
-        async function initLIFF() {
-            try {
-                await liff.init({ liffId });
-                if (!liff.isLoggedIn()) {
-                    liff.login();
-                } else {
-                    const profile = await liff.getProfile();
-                    document.getElementById('userName').innerText = profile.displayName;
-                    fetchData();
+            const payload = {
+                action: app.editingProductIdx !== null ? 'updateProduct' : 'createProduct',
+                eventId: app.eventId,
+                data: {
+                    eventId: app.eventId,
+                    sellerId: app.user.id,
+                    sellerName: app.user.name,
+                    // If creating, id is null (backend generates). If updating, pass ID.
+                    id: app.editingProductIdx !== null ? (app.myProducts[app.editingProductIdx].ID || app.myProducts[app.editingProductIdx].id) : null,
+                    // backend_v4.5 expects 'id' for update.
+                    // It uses Date.now() for PID on create.
+                    name: document.getElementById('prod-name').value,
+                    price: document.getElementById('prod-price').value,
+                    category: document.getElementById('prod-cat').value,
+                    specs: specs,
+                    imageBase64: app.prodImgBase64,
+                    imageUrl: app.editingProductIdx !== null && !app.prodImgBase64 ? document.getElementById('preview-prod-img').src : null
                 }
-            } catch (err) { 
-                console.log("LIFF Error");
-                fetchData(); // 即使 LIFF 失敗也嘗試載入
-            }
-        }
+            };
 
-        async function fetchData() {
             try {
-                // 第一次讀取不強制刷新
-                const response = await fetch(gasUrl);
-                allData = await response.json();
-                document.getElementById('loading').style.display = 'none';
-                showAlbumList();
-            } catch (err) { 
-                document.getElementById('loading').innerText = "載入失敗，請檢查網路。"; 
+                const res = await fetch(`${GAS_URL}?eventId=${app.eventId}`, { method: 'POST', body: JSON.stringify(payload) });
+                const json = await res.json();
+                if (json.result === 'success') {
+                    alert(app.editingProductIdx !== null ? '✅ 修改成功' : '✅ 上架成功');
+                    document.getElementById('sell-form').reset();
+                    app.prodImgBase64 = null;
+                    document.getElementById('preview-prod-img').classList.add('hidden');
+                    cancelEdit(); // Reset Mode
+                    fetchMyProducts(); // Refresh List
+                } else alert('操作失敗: ' + json.message);
+            } catch (e) { alert('Error'); }
+
+            btn.innerHTML = '確認上架'; btn.disabled = false;
+        }
+
+        // --- PRODUCT EDIT LOGIC ---
+        app.myProducts = [];
+        app.editingProductIdx = null;
+
+        async function fetchMyProducts() {
+            try {
+                // Add timestamp to prevent caching
+                const res = await fetch(`${GAS_URL}?action=getStoreData&storeId=${app.user.id}&eventId=${app.eventId}&_t=${Date.now()}`);
+                const json = await res.json();
+                console.log('My Products:', json); // Debug
+                app.myProducts = json.products || [];
+                renderSellerProducts();
+            } catch (e) { console.error('Fetch My Products Error', e); }
+        }
+
+        function renderSellerProducts() {
+            const container = document.getElementById('seller-product-list');
+            if (app.myProducts.length === 0) {
+                container.innerHTML = '<p class="text-center text-stone-400 text-xs py-4">您還沒有上架任何商品</p>';
+                return;
+            }
+            container.innerHTML = app.myProducts.map((p, i) => `
+                <div class="flex items-center gap-3 bg-stone-50 p-3 rounded-xl">
+                    <img src="${p.Image && p.Image.startsWith('http') ? fixDriveUrl(p.Image) : 'https://placehold.co/80'}" class="w-12 h-12 rounded-lg object-cover bg-stone-200">
+                    <div class="flex-1 min-w-0">
+                        <h4 class="font-bold text-sm text-stone-800 truncate">${p.Name}</h4>
+                        <p class="text-orange-600 font-bold text-xs">${p.Price == 0 ? '免費' : '$' + p.Price}</p>
+                    </div>
+                    <button onclick="editProduct(${i})" class="bg-blue-50 text-blue-600 px-3 py-1.5 rounded-lg text-xs font-bold">編輯</button>
+                    <button onclick="deleteProduct(${i})" class="bg-red-50 text-red-600 px-3 py-1.5 rounded-lg text-xs font-bold">刪除</button>
+                </div>
+            `).join('');
+        }
+
+
+        async function deleteProduct(idx) {
+            const p = app.myProducts[idx];
+            if (!confirm(`確定要刪除商品「${p.Name}」嗎？`)) return;
+
+            const payload = {
+                action: 'deleteProduct',
+                eventId: app.eventId,
+                data: {
+                    eventId: app.eventId,
+                    id: p.ID || p.id
+                }
+            };
+
+            try {
+                const res = await fetch(`${GAS_URL}?eventId=${app.eventId}`, { method: 'POST', body: JSON.stringify(payload) });
+                const json = await res.json();
+                if (json.result === 'success') {
+                    alert('✅ 商品已刪除');
+                    fetchMyProducts(); // Refresh list
+                } else alert('刪除失敗: ' + json.message);
+            } catch (e) { alert('連線失敗'); }
+        }
+
+        function editProduct(idx) {
+            const p = app.myProducts[idx];
+            app.editingProductIdx = idx;
+
+            // Fill Form
+            document.getElementById('prod-name').value = p.Name;
+            document.getElementById('prod-price').value = p.Price;
+            document.getElementById('prod-cat').value = p.Category || '';
+
+            // Image
+            document.getElementById('preview-prod-img').src = fixDriveUrl(p.Image);
+            document.getElementById('preview-prod-img').classList.remove('hidden');
+            app.prodImgBase64 = null; // Don't change unless new upload
+
+            // Specs
+            const specs = JSON.parse(p.Specs || '{}');
+            const container = document.getElementById('specs-container');
+            container.innerHTML = '';
+            Object.keys(specs).forEach(k => {
+                const d = document.createElement('div');
+                d.className = "flex gap-2";
+                d.innerHTML = `<input class="spec-key w-1/3 p-2 rounded text-xs" value="${k}"><input class="spec-vals flex-1 p-2 rounded text-xs" value="${specs[k].join(',')}">`;
+                container.appendChild(d);
+            });
+            if (Object.keys(specs).length === 0) addSpecLine(); // Default empty line
+
+            // Change UI
+            document.getElementById('submit-prod-btn').innerHTML = '確認修改';
+            document.getElementById('submit-prod-btn').classList.replace('bg-orange-500', 'bg-blue-600');
+
+            // Add Cancel Button if not exists
+            if (!document.getElementById('btn-cancel-edit')) {
+                const btn = document.createElement('button');
+                btn.id = 'btn-cancel-edit';
+                btn.type = 'button';
+                btn.className = 'w-full bg-stone-200 text-stone-500 font-bold py-3 rounded-xl mt-2';
+                btn.innerText = '取消修改';
+                btn.onclick = cancelEdit;
+                document.getElementById('sell-form').appendChild(btn);
+            }
+
+            // Scroll to form
+            document.getElementById('sell-form').scrollIntoView({ behavior: 'smooth' });
+        }
+
+        function cancelEdit() {
+            app.editingProductIdx = null;
+            document.getElementById('sell-form').reset();
+            document.getElementById('preview-prod-img').classList.add('hidden');
+            app.prodImgBase64 = null;
+            document.getElementById('specs-container').innerHTML = '';
+            addSpecLine();
+
+            document.getElementById('submit-prod-btn').innerHTML = '確認上架';
+            document.getElementById('submit-prod-btn').classList.replace('bg-blue-600', 'bg-orange-500');
+
+            const cancelBtn = document.getElementById('btn-cancel-edit');
+            if (cancelBtn) cancelBtn.remove();
+        }
+
+        function addSpecLine() {
+            const d = document.createElement('div');
+            d.className = "flex gap-2";
+            d.innerHTML = '<input class="spec-key w-1/3 p-2 rounded text-xs" placeholder="規格名"><input class="spec-vals flex-1 p-2 rounded text-xs" placeholder="選項1,選項2">';
+            document.getElementById('specs-container').appendChild(d);
+        }
+
+        // --- SELLER ORDERS & PRINT ---
+        app.sellerOrders = [];
+
+        async function fetchSellerOrders() {
+            const list = document.getElementById('seller-order-list');
+            list.innerHTML = '<p class="text-center text-stone-400 text-xs py-4">讀取中...</p>';
+
+            try {
+                const res = await fetch(`${GAS_URL}?action=getOrders&storeId=${app.user.id}&eventId=${app.eventId}&_t=${Date.now()}`);
+                const json = await res.json();
+                app.sellerOrders = json.orders || [];
+                renderSellerOrders();
+            } catch (e) {
+                console.error(e);
+                list.innerHTML = '<p class="text-center text-red-500 text-xs py-4">讀取失敗</p>';
             }
         }
 
-        // 輔助函式：產生 Google Drive 縮圖網址
-        function getThumb(id, size = 'w400') {
-            return `https://drive.google.com/thumbnail?id=${id}&sz=${size}`;
-        }
-
-        function showAlbumList() {
-            document.getElementById('floatingMenu').style.display = 'none';
-            document.getElementById('photoGrid').style.display = 'none';
-            const albumGrid = document.getElementById('albumGrid');
-            albumGrid.style.display = 'grid'; 
-            albumGrid.innerHTML = "";
-            
-            // 整理分類資料
-            const sortedCats = allData.categories.map(cat => {
-                const photos = allData.allFiles.filter(p => String(p.category) === String(cat.name));
-                // 因為後端已經轉成 timestamp，這裡直接比較數字
-                const latestDate = photos.length > 0 ? photos[0].date : 0;
-                return { ...cat, latestDate, photos };
-            });
-
-            sortedCats.sort((a, b) => b.latestDate - a.latestDate);
-
-            sortedCats.forEach(cat => {
-                // 如果該分類沒照片，顯示預設圖或不顯示
-                if (cat.photos.length === 0) return;
-
-                const coverId = cat.photos[0].id;
-                const coverUrl = getThumb(coverId, 'w400');
-                
-                const div = document.createElement('div');
-                div.className = 'card'; 
-                div.onclick = () => showPhotos(cat.name);
-                div.innerHTML = `<img src="${coverUrl}" loading="lazy"><br>
-                                <div style="font-size:12px;margin-top:5px;font-weight:bold;">${cat.name}</div>
-                                <div style="font-size:10px;color:#8d6e63;">(${cat.photos.length} 項目)</div>`;
-                albumGrid.appendChild(div);
-            });
-        }
-
-        function showPhotos(catName) {
-            document.getElementById('albumGrid').style.display = 'none';
-            document.getElementById('floatingMenu').style.display = 'flex';
-            const photoGrid = document.getElementById('photoGrid');
-            photoGrid.style.display = 'grid'; 
-            photoGrid.innerHTML = "";
-            
-            const filteredFiles = allData.allFiles.filter(p => String(p.category) === String(catName));
-            
-            filteredFiles.forEach(item => {
-                const thumb = getThumb(item.id, 'w600');
-                const isVideo = item.type && item.type.includes('video');
-                const div = document.createElement('div');
-                div.className = 'photo-item'; 
-                div.onclick = () => openViewer(item.id, isVideo);
-                
-                let icon = isVideo ? '<div class="video-label">▶</div>' : '';
-                div.innerHTML = `${icon}<img src="${thumb}" loading="lazy"><p style="font-size:10px;text-align:center;margin-top:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${item.name}</p>`;
-                photoGrid.appendChild(div);
-            });
-            window.scrollTo({top: 0, behavior: 'instant'});
-        }
-
-        function openViewer(id, isVideo) {
-            const content = document.getElementById('viewerContent');
-            const overlay = document.getElementById('viewerOverlay');
-            content.innerHTML = '<span id="closeBtn" onclick="closeViewer()">✕</span>';
-            
-            if (isVideo) {
-                content.innerHTML += `<iframe src="https://drive.google.com/file/d/${id}/preview" width="100%" height="100%" frameborder="0" allow="autoplay" style="background:#000;"></iframe>`;
-            } else {
-                // 檢視大圖使用 w1200
-                const bigImg = getThumb(id, 'w1200');
-                content.innerHTML += `<img src="${bigImg}" style="max-width:100%; max-height:100%; object-fit:contain; box-shadow: 0 0 20px rgba(0,0,0,0.5);">`;
+        function renderSellerOrders() {
+            const list = document.getElementById('seller-order-list');
+            if (app.sellerOrders.length === 0) {
+                list.innerHTML = '<p class="text-center text-stone-400 text-xs py-4">目前沒有訂單</p>';
+                return;
             }
-            overlay.style.display = 'flex'; 
-            document.body.style.overflow = 'hidden';
+            list.innerHTML = app.sellerOrders.map((o, i) => `
+                <div onclick="viewOrder(${i})" class="bg-stone-50 p-3 rounded-xl flex justify-between items-center cursor-pointer active:bg-stone-100">
+                    <div>
+                        <p class="font-bold text-sm text-stone-800">${o.recipientName || '顧客'} <span class="text-xs font-normal text-stone-400">(${o.time.split(' ')[1] || o.time})</span></p>
+                        <p class="text-xs text-stone-500">總計 $${o.total}</p>
+                    </div>
+                    <div class="text-stone-300">➜</div>
+                </div>
+            `).join('');
         }
 
-        function closeViewer() { 
-            document.getElementById('viewerContent').innerHTML = ""; 
-            document.getElementById('viewerOverlay').style.display = 'none'; 
-            document.body.style.overflow = 'auto'; 
+        function viewOrder(idx) {
+            const o = app.sellerOrders[idx];
+            const modal = document.getElementById('order-modal');
+            const content = document.getElementById('receipt-node');
+
+            // Build Receipt HTML
+            content.innerHTML = `
+                <div class="text-center border-b-2 border-stone-800 pb-4 mb-4">
+                    <h2 class="text-2xl font-black">${app.user.name} (出貨單)</h2>
+                    <p class="text-xs mt-1">單號: ${o.id}</p>
+                    <p class="text-xs">時間: ${o.time}</p>
+                </div>
+                <div class="space-y-1 mb-4 text-sm">
+                    <p><b>顧客:</b> ${o.recipientName} / ${o.recipientPhone}</p>
+                    <p><b>方式:</b> ${getShipMethodName(o.method)}</p>
+                    <p class="text-xs text-stone-500 break-words">${o.address}</p>
+                </div>
+                <table class="w-full text-sm mb-4">
+                    <thead>
+                        <tr class="border-b border-stone-300 text-left">
+                            <th class="py-1">品項</th>
+                            <th class="py-1 w-8 text-center">量</th>
+                            <th class="py-1 w-12 text-right">小計</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-stone-100">
+                        ${o.items.map(item => `
+                            <tr>
+                                <td class="py-2">
+                                    <div class="font-bold">${item.name}</div>
+                                    <div class="text-xs text-stone-400">${Object.values(item.spec || {}).join('/')}</div>
+                                </td>
+                                <td class="py-2 text-center font-bold">${item.qty}</td>
+                                <td class="py-2 text-right">$${item.price * item.qty}</td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+                <div class="border-t-2 border-stone-800 pt-2 flex justify-between items-center font-black text-xl">
+                    <span>總金額</span>
+                    <span>$${o.total}</span>
+                </div>
+                <div class="mt-4 text-[10px] text-center text-stone-400">
+                    Garden Party Order System
+                </div>
+            `;
+
+            modal.classList.remove('hidden');
         }
 
-        initLIFF();
+        function getShipMethodName(m) {
+            if (m === 'home') return '宅配到府';
+            if (m === 'cvs') return '超商取貨';
+            if (m === 'pickup') return '攤位自取';
+            return m;
+        }
+
+        function closeOrderModal() {
+            document.getElementById('order-modal').classList.add('hidden');
+        }
+
+        function printOrderImage() {
+            const node = document.getElementById('receipt-node');
+
+            // Temporarily disable scaling for better capture? 
+            // html2canvas works best if element is visible.
+
+            html2canvas(node, {
+                scale: 2, // Retinas support
+                backgroundColor: "#ffffff",
+                logging: false,
+                useCORS: true // Attempt to load remote images if any
+            }).then(canvas => {
+                const imgData = canvas.toDataURL("image/jpeg", 0.9);
+                document.getElementById('generated-receipt-img').src = imgData;
+                document.getElementById('img-modal').classList.remove('hidden');
+            });
+        }
+
+        // --- STORAGE ---
+        function saveCartLocal() {
+            localStorage.setItem('cart', JSON.stringify(app.cart));
+            localStorage.setItem('cartStoreId', app.cartStoreId || '');
+        }
+        function loadCartLocal() {
+            const c = localStorage.getItem('cart');
+            if (c) app.cart = JSON.parse(c);
+            app.cartStoreId = localStorage.getItem('cartStoreId');
+        }
+
     </script>
 </body>
+
 </html>
